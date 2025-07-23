@@ -1,0 +1,41 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Remote Attach",
+            "type": "python",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 5678
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}",
+                    "remoteRoot": "."
+                }
+            ],
+            "justMyCode": true
+        },
+        {
+            "name": "Python: Greedy Algorithm",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/phase1/greedy.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/phase1",
+            "justMyCode": true
+        },
+        {
+            "name": "Debug Greedy Algorithm",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/phase1/greedy.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/phase1",
+            "justMyCode": true,
+            "stopOnEntry": false,
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe"
+        }
+    ]
+} 
