@@ -1,65 +1,148 @@
 import xlsxwriter
+from datetime import datetime
 
 import Ref
 import Game
 
 def schedule_to_excel(refs):
-    workbook = xlsxwriter.Workbook('schedule.xlsx')
-    worksheet = workbook.add_worksheet('Schedule')
-
-    # Get all days from the games
+    workbook = xlsxwriter.Workbook('DATA/schedule.xlsx')
+    
+    # Get all days and times from the games
     days = set()
+    all_times = set()
     for ref in refs:
         for game in ref.games:
-            days.add(game.get_time_slot().split('_')[0])
+            day, time = game.get_time_slot().split('_')
+            days.add(day)
+            all_times.add(time)
 
-    # Sort days by day of week (Monday first, Sunday last)
+    # Sort days by day of week and times chronologically
     day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     days = sorted(days, key=lambda day: day_order.index(day) if day in day_order else 999)
+    times = sorted(list(all_times))
     
-    # Write headers
-    headers = ['Name'] + list(days) 
-    print(headers)
-    header_fmt = workbook.add_format({"bold": True, 'bg_color': '#000000', 'font_color': 'white', 'border': 1, 'border_color': 'black'})
-    worksheet.write_row(0, 0, headers, header_fmt)
+    # Define formats
+    header_format = workbook.add_format({
+        'bold': True,
+        'bg_color': '#881C1C',
+        'font_color': 'white',
+        'align': 'center',
+        'valign': 'vcenter',
+        'border': 1
+    })
     
-    # Set column widths - day columns should be 4 times wider
-    worksheet.set_column(0, 0, 30)  # Name column
-    for i, day in enumerate(days):
-        worksheet.set_column(i + 1, i + 1, 30)  # Day columns (4 times wider)
-
-    # Create UMass maroon format for time cells with white text and black borders
-    umass_maroon_fmt = workbook.add_format({'bg_color': '#881C1C', 'font_color': 'white', 'border': 1, 'border_color': 'black'})
-    # Create format for name cells with black borders
-    name_fmt = workbook.add_format({'border': 1, 'border_color': 'black'})
-
-    for ref in refs:
-        times_per_day = {
-            day: [] for day in days
-        }
-        for game in ref.games:
-            # Format time to match image format (remove leading zeros and ensure colon format)
-            formatted_time = game.time.lstrip('0') if game.time.startswith('0') else game.time
-            if ':' not in formatted_time:
-                # If no colon, assume it's just hour and add :00
-                formatted_time += ':00'
-            times_per_day[game.date].append(formatted_time)
-        row_data = [ref.name]
-        row_index = refs.index(ref) + 1
+    name_format = workbook.add_format({
+        'bg_color': '#FFCCCB',  # Peach
+        'align': 'left',
+        'valign': 'vcenter',
+        'border': 1
+    })
+    
+    time_format = workbook.add_format({
+        'bg_color': '#696969',  # Mid-dark grey
+        'font_color': 'white',
+        'align': 'center',
+        'valign': 'vcenter',
+        'border': 1
+    })
+    
+    verification_format = workbook.add_format({
+        'bg_color': '#D3D3D3',  # Light grey
+        'align': 'center',
+        'valign': 'vcenter',
+        'border': 1
+    })
+    
+    comments_format = workbook.add_format({
+        'bg_color': '#696969',  # Mid-dark grey
+        'font_color': 'white',
+        'align': 'center',
+        'valign': 'vcenter',
+        'border': 1
+    })
+    
+    # Create a sheet for each day
+    for day in days:
+        worksheet = workbook.add_worksheet(day)
         
-        # Write ref name with black borders
-        worksheet.write(row_index, 0, ref.name, name_fmt)
+        # Set current date (you can modify this to use actual dates)
+        current_date = f"{day} - [Insert Date]"
         
-        # Write times with UMass maroon background, white text, and black borders for each day
-        for col_index, day in enumerate(days):
-            times = times_per_day[day]
-            # Sort times from earliest to latest
-            times.sort(key=lambda t: (int(t.split(':')[0]) % 12 + (12 if 'PM' in t or (int(t.split(':')[0]) >= 12 and 'AM' not in t) else 0), int(t.split(':')[1])))
-            cell_text = ', '.join(times) if times else ''
+        # Row 0: Date header
+        worksheet.merge_range('A1:Z1', current_date, header_format)
+        
+        # Row 1: Main headers
+        col = 0
+        
+        # Official's Name header (merged across 2 rows)
+        worksheet.merge_range(1, col, 2, col, "Official's Name", header_format)
+        worksheet.set_column(col, col, 20)
+        col += 1
+        
+        # Time headers
+        worksheet.write(1, col, "Time", header_format)
+        for time in times:
+            worksheet.write(2, col, time, header_format)
+            worksheet.set_column(col, col, 8)
+            col += 1
+        
+        # Verification headers
+        start_verification = col
+        worksheet.write(1, col, "Verification", header_format)
+        for time in times:
+            worksheet.write(2, col, time, header_format)
+            worksheet.set_column(col, col, 8)
+            col += 1
+        
+        # Comments/Late header
+        worksheet.merge_range(1, col, 2, col, "Comments / Late", header_format)
+        worksheet.set_column(col, col, 15)
+        
+        # Get refs that work on this day
+        refs_for_day = []
+        for ref in refs:
+            ref_times_this_day = []
+            for game in ref.games:
+                if game.date == day:
+                    ref_times_this_day.append(game.time)
             
-            # Apply UMass maroon background with white text and black borders to all time cells
-            worksheet.write(row_index, col_index + 1, cell_text, umass_maroon_fmt)
+            # Include refs that have games this day OR are available this day
+            has_availability = any(ref.availability.get(f"{day}_{time}", False) for time in times)
+            if ref_times_this_day or has_availability:
+                refs_for_day.append((ref, ref_times_this_day))
+        
+        # Sort refs alphabetically
+        refs_for_day.sort(key=lambda x: x[0].name)
+        
+        # Fill in referee data
+        row = 3  # Start after headers
+        for ref, scheduled_times in refs_for_day:
+            # Official's Name
+            worksheet.write(row, 0, ref.name, name_format)
             
+            # Time columns
+            col = 1
+            for time in times:
+                if time in scheduled_times:
+                    worksheet.write(row, col, "✓", time_format)
+                else:
+                    worksheet.write(row, col, "-", time_format)
+                col += 1
+            
+            # Verification columns
+            for time in times:
+                worksheet.write(row, col, "", verification_format)
+                col += 1
+            
+            # Comments column
+            worksheet.write(row, col, "", comments_format)
+            
+            row += 1
+        
+        # Set row heights
+        worksheet.set_row(0, 25)  # Date row
+        worksheet.set_row(1, 20)  # Header row 1
+        worksheet.set_row(2, 20)  # Header row 2
 
     workbook.close()
 

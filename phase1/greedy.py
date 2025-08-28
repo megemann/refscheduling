@@ -15,7 +15,7 @@ from schedule_to_excel import schedule_to_excel
 def __main__():
     
     # Load availability data from CSV
-    csv_path = 'C:/Users/16073/refscheduling/DATA/phase1/BB2025Phase1Convert.csv'
+    csv_path = 'DATA/phase1/Convert.csv'
     availability = load_availability_csv(csv_path)
 
     games = define_games(availability)  # Set breakpoint here
