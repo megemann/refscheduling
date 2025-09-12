@@ -38,8 +38,7 @@ Pros:
 Cons:
 - No concept of time grouping - some people work all 4 days
 - No concept of game strength; tie breakers would have to be a balance of multi-objective
-- No guarentee of termination
-- 
+- No guarantee of termination
 
 ### Takeaways:
 - The boundary checking is good here. In the future we should
