@@ -17,6 +17,18 @@ st.set_page_config(
     layout="centered"
 )
 
+# Add CSS for wider container
+st.markdown("""
+<style>
+.main > div {
+    max-width: 85% !important;
+}
+.block-container {
+    max-width: 85% !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.title("📊 Availability Setup")
 st.markdown("Follow these steps to set up referee availability:")
 
@@ -85,7 +97,7 @@ if 'selected_days' in locals() and 'selected_times' in locals() and selected_day
             data=custom_excel_data,
             file_name=f"custom_referee_template_{len(selected_days)}days_{len(selected_times)}times.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
+            width='stretch'
         )
     except Exception as e:
         st.error(f"Error generating custom template: {str(e)}")
@@ -105,7 +117,7 @@ uploaded_file = st.file_uploader(
 if uploaded_file is not None:
     st.write(f"**File:** {uploaded_file.name}")
     
-    if st.button("🔄 Process Upload", use_container_width=True):
+    if st.button("🔄 Process Upload", width='stretch'):
         with st.spinner("Processing your file..."):
             processed_df = process_uploaded_file(uploaded_file)
             
@@ -130,7 +142,7 @@ if uploaded_file is not None:
 # Reset button to upload another file
 if os.path.exists('DATA/Convert.csv'):
     st.markdown("---")
-    if st.button("🔄 Reset & Upload Another File", type="secondary", use_container_width=True):
+    if st.button("🔄 Reset & Upload Another File", type="secondary", width='stretch'):
         # Clear the existing data
         if clear_availability_data():
             st.success("✅ Data cleared! You can now upload a new availability file.")
@@ -222,7 +234,7 @@ if has_data:
         data=csv_data,
         file_name="referee_availability_processed.csv",
         mime="text/csv",
-        use_container_width=True
+        width='stretch'
     )
     
     # Show availability by time slot
@@ -263,11 +275,9 @@ if has_data:
         else:
             st.warning("No time slot data found. Please check your data format.")
     
-    # Next step navigation
+    # Next step status
     st.markdown("---")
-    st.success("✅ **Availability setup complete!** Ready for game management.")
-    if st.button("➡️ Continue to Game Management", use_container_width=True):
-        st.switch_page("pages/Game_Management.py")
+    st.success("✅ **Availability setup complete!** Ready for next steps.")
     
 else:
     st.info("📋 No availability data found. Upload a completed template to get started!")

@@ -192,60 +192,6 @@ $$
 x_{r,d,h,g} \leq G_{d,h,g} \qquad \forall r \in R,\ \forall d \in D,\ \forall h \in H,\ \forall g \in G
 $$
 
-**OLDDD Optimization Criteria:**
-
-We start by defining useful metrics and functions
-1. $N$ denotes the number of referees, 
-2. $h_i = \sum_{j}\sum_{k}\sum_{l}x_{i,j,k,l}$, and $\bar{h} = \frac{1}{N}\sum_{i}h_i$ (hours for ref i, mean hours over all refs)
-3. $\text{exgap}(d,h,g,x) = (\frac{1}{M}\sum_{i \in R_{d,h,g}} REx_{i}) - GEx_{d,h,g}$
-   - where $R_{d,h,g} = r \in x_{r,d,h,g} = 1$, and $M = |R|$
-4. Define time blocks (The total number of shifts where there is no shift worked before it):
-$$
-blocks_r = \sum_d \sum_h start_{r,d,h}
-$$
-
-where $start_{r,d,h}$ is a binary variable indicating if referee $r$ starts a new time block at hour $h$ on day $d$, subject to:
-
-$$
-\forall r,d,h: \quad start_{r,d,h} \geq \sum_g x_{r,d,h,g} - \sum_g x_{r,d,h-1,g}
-$$
-
-$$
-\forall r,d,h: \quad start_{r,d,h} \leq \sum_g x_{r,d,h,g}
-$$
-
-with $\sum_g x_{r,d,h-1,g} = 0$ for the first hour of each day.
-
-____
-_Penalizing the difference of each referees hours away from the mean_
-$$
-b(x) =  \sqrt{\frac{1}{N} \sum_{i=1}^{N} (h_i- \bar{h})^2}
-$$
-   
- 
-_Awarding higher effort with more hours_
-$$
-e(x) = \frac{1}{N}\sum_{i}E_{i}h_i
-$$
-
-
-_Awarding lesser number of continuous time blocks:_
-$$
-tb(x) = \frac{1}{N}\sum_r blocks_r = \frac{1}{N}\sum_r \sum_d \sum_h start_{r,d,h}
-$$
-
-_Awarding Lower-Higher Skills pairs_
-$$
-p(x) = \frac{1}{L}\sum_{d}\sum_{h}\sum_{g}\sqrt{\frac{1}{M} \sum_{i \in R_{d,h,g}}^{M} (REx_i- \bar{REx})^2}
-$$
-- Where L is the total number of games, and $M = |R|$
-
-_Penalizing lower mean skill score when compared to game score:_
-$$
-s(x) = \frac{1}{L}\sum_{d}\sum_{h}\sum_{g}min(0, \text{exgap}(d,h,g,x))
-$$
-- Where L is the total number of games
-
 **Optimization Criteria:**
 
 We start by defining useful metrics and functions

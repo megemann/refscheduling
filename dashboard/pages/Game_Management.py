@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import sys
 import os
+from datetime import datetime, time
 
 # Add the parent directory to the path to import from phase1
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -9,12 +10,31 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 # Import utility functions
 from dashboard.utils.file_processor import load_availability_data
 
+# Import Game class
+try:
+    from phase2.Game import Game
+except ImportError:
+    st.error("Could not import Game class. Please ensure phase2/Game.py exists.")
+    st.stop()
+
 # Set page config
 st.set_page_config(
     page_title="Game Management",
     page_icon="🎮",
     layout="centered"
 )
+
+# Add CSS for wider container
+st.markdown("""
+<style>
+.main > div {
+    max-width: 85% !important;
+}
+.block-container {
+    max-width: 85% !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 st.title("🎮 Game Management")
 
@@ -33,7 +53,7 @@ if not has_availability_data:
     
     st.info("👈 Go back to **Step 1: Availability Setup** to get started")
     
-    if st.button("⬅️ Go to Availability Setup", use_container_width=True):
+    if st.button("⬅️ Go to Availability Setup", width='stretch'):
         st.switch_page("pages/Availability_Setup.py")
     
 else:
@@ -53,167 +73,529 @@ else:
     with col3:
         st.metric("Total Availability", availability_df.sum().sum())
 
-    # Games per time slot input section
+    # Initialize games in session state
+    if 'games' not in st.session_state:
+        st.session_state['games'] = []
+
+    # Game Management Section
     st.markdown("---")
-    st.subheader("🎯 Games per Time Slot")
-    st.write("Enter the number of games needed for each time slot:")
+    st.subheader("🎮 Game Management")
     
-    # Create time slot summary for games input
-    time_slot_data = []
-    for col in availability_df.columns:
-        if '_' in col:
-            try:
-                day, time = col.split('_', 1)
-                count = availability_df[col].sum()
-                time_slot_data.append({
-                    'Day': day,
-                    'Time': time,
-                    'Available_Refs': int(count),
-                    'Column': col
-                })
-            except Exception as e:
-                continue
+    # Create subtabs for different game creation methods
+    tab1, tab2, tab3 = st.tabs(["🔄 Bulk Creation", "📊 Excel Input", "🌐 Fusion Parser"])
     
-    if time_slot_data:
-        # Sort by day order then by time
-        day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        time_slot_df = pd.DataFrame(time_slot_data)
-        time_slot_df['day_sort'] = time_slot_df['Day'].apply(lambda x: day_order.index(x) if x in day_order else 999)
-        time_slot_df = time_slot_df.sort_values(['day_sort', 'Time']).drop('day_sort', axis=1)
+    with tab1:
+        st.markdown("#### 🔄 Bulk Game Creation")
+        st.write("Create multiple games quickly using the existing time slot interface, then customize details individually.")
         
-        # Create input fields for each time slot
-        games_data = []
-        prev_day = None
-        for idx, row in time_slot_df.iterrows():
-            # Insert a border when the day changes (but not before the first day)
-            if prev_day is not None and row['Day'] != prev_day:
-                st.markdown('<hr style="border-top: 2px solid #bbb; margin: 0.5em 0;">', unsafe_allow_html=True)
-            col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
-            with col1:
-                st.write(f"**{row['Day']}**")
-            with col2:
-                st.write(f"{row['Time']}")
-            with col3:
-                st.write(f"{row['Available_Refs']} refs available")
-            with col4:
-                num_games = st.number_input(
-                    "Games",
-                    min_value=0,
-                    max_value=10,
-                    value=0,
-                    key=f"games_{row['Column']}",
-                    label_visibility="collapsed"
-                )
-                games_data.append({
-                    'Day': row['Day'],
-                    'Time': row['Time'],
-                    'Available_Refs': row['Available_Refs'],
-                    'Games_Needed': num_games
-                })
-            prev_day = row['Day']
+        # Default settings for bulk creation
+        col1, col2 = st.columns(2)
+        with col1:
+            default_min_refs = st.number_input(
+                "Default Min Refs",
+                min_value=1,
+                max_value=5,
+                value=2,
+                help="Default minimum referees for all games"
+            )
+        with col2:
+            default_max_refs = st.number_input(
+                "Default Max Refs", 
+                min_value=1,
+                max_value=5,
+                value=3,
+                help="Default maximum referees for all games"
+            )
         
-        # Show summary of games input
-        games_with_refs = [g for g in games_data if g['Games_Needed'] > 0]
-        if games_with_refs:
-            st.markdown("---")
-            st.subheader("📋 Games Summary")
-            games_summary_df = pd.DataFrame(games_with_refs)
-            st.dataframe(games_summary_df, width='stretch', hide_index=True)
+        if default_max_refs < default_min_refs:
+            st.warning("⚠️ Max refs must be >= Min refs")
+        
+        # Move the existing bulk creation logic here
+        st.write("Enter the number of games needed for each time slot:")
+        
+        # Create time slot summary for games input
+        time_slot_data = []
+        for col in availability_df.columns:
+            if '_' in col:
+                try:
+                    day, time_str = col.split('_', 1)
+                    count = availability_df[col].sum()
+                    time_slot_data.append({
+                        'Day': day,
+                        'Time': time_str,
+                        'Available_Refs': int(count),
+                        'Column': col
+                    })
+                except Exception as e:
+                    continue
+
+        if time_slot_data and default_max_refs >= default_min_refs:
+            # Sort by day order then by time
+            day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            time_slot_df = pd.DataFrame(time_slot_data)
+            time_slot_df['day_sort'] = time_slot_df['Day'].apply(lambda x: day_order.index(x) if x in day_order else 999)
             
-            # Calculate total games and required refs
-            total_games = sum(g['Games_Needed'] for g in games_with_refs)
-            total_refs_needed = total_games * 3  # Assuming 3 refs per game
+            # Parse time strings for proper sorting (earliest time first)
+            def parse_time_for_sort(time_str):
+                """Convert time string to comparable format for sorting"""
+                try:
+                    from datetime import datetime
+                    # Parse time string like "6:30 PM" or "10:30 AM"
+                    time_obj = datetime.strptime(time_str, "%I:%M %p")
+                    return time_obj.time()
+                except:
+                    # If parsing fails, return a default time for sorting
+                    return datetime.strptime("12:00 PM", "%I:%M %p").time()
             
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Total Games", total_games)
-            with col2:
-                st.metric("Refs Needed", total_refs_needed)
-            with col3:
-                coverage = (total_refs_needed / availability_df.sum().sum() * 100) if availability_df.sum().sum() > 0 else 0
-                st.metric("Coverage %", f"{coverage:.1f}%")
-            
-            # Check for potential issues
-            issues = []
-            for game in games_with_refs:
-                refs_needed = game['Games_Needed'] * 3
-                if refs_needed > game['Available_Refs']:
-                    issues.append(f"{game['Day']} {game['Time']}: Need {refs_needed} refs, only {game['Available_Refs']} available")
-            
-            if issues:
-                st.warning("⚠️ **Potential Scheduling Issues:**")
-                for issue in issues:
-                    st.write(f"• {issue}")
-            else:
-                st.success("✅ All time slots have sufficient referee coverage!")
-            
-            # Run scheduling button
-            st.markdown("---")
-            st.subheader("🚀 Run Scheduling Algorithm")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                algorithm_choice = st.selectbox(
-                    "Choose Algorithm:",
-                    ["Greedy (Fast)", "Optimization (Coming Soon)"],
-                    help="Greedy algorithm provides quick results, optimization will be available in Phase 2"
-                )
-            
-            with col2:
-                refs_per_game = st.number_input(
-                    "Referees per Game:",
-                    min_value=1,
-                    max_value=5,
-                    value=3,
-                    help="Number of referees to assign to each game"
-                )
-            
-            if st.button("🎯 Run Scheduling Algorithm", use_container_width=True, type="primary"):
-                if algorithm_choice == "Greedy (Fast)":
-                    with st.spinner("Running greedy scheduling algorithm..."):
-                        # Here you would integrate with your greedy algorithm
-                        # For now, show a placeholder
-                        st.success("✅ Scheduling completed!")
-                        st.info("📋 Algorithm results would appear here")
-                        st.markdown("**Next Steps:**")
-                        st.markdown("- Review generated schedule")
-                        st.markdown("- Make manual adjustments if needed")
-                        st.markdown("- Export to Excel for use")
-                        
-                        # Placeholder for schedule display
-                        st.markdown("---")
-                        st.subheader("📊 Generated Schedule Preview")
-                        st.info("Schedule results will be displayed here once the algorithm is integrated")
+            time_slot_df['time_sort'] = time_slot_df['Time'].apply(parse_time_for_sort)
+            time_slot_df = time_slot_df.sort_values(['day_sort', 'time_sort']).drop(['day_sort', 'time_sort'], axis=1)
+        
+            # Create input fields for each time slot
+            games_data = []
+            prev_day = None
+            for idx, row in time_slot_df.iterrows():
+                # Insert a border when the day changes (but not before the first day)
+                if prev_day is not None and row['Day'] != prev_day:
+                    st.markdown('<hr style="border-top: 2px solid #bbb; margin: 0.5em 0;">', unsafe_allow_html=True)
+                col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
+                with col1:
+                    st.write(f"**{row['Day']}**")
+                with col2:
+                    st.write(f"{row['Time']}")
+                with col3:
+                    st.write(f"{row['Available_Refs']} refs available")
+                with col4:
+                    num_games = st.number_input(
+                        "Games",
+                        min_value=0,
+                        max_value=10,
+                        value=0,
+                        key=f"bulk_games_{row['Column']}",
+                        label_visibility="collapsed"
+                    )
+                    games_data.append({
+                        'Day': row['Day'],
+                        'Time': row['Time'],
+                        'Available_Refs': row['Available_Refs'],
+                        'Games_Needed': num_games,
+                        'Column': row['Column']
+                    })
+                prev_day = row['Day']
+        
+            # Create games button
+            if st.button("🎯 Create Bulk Games", width='stretch', type="primary"):
+                games_to_create = [g for g in games_data if g['Games_Needed'] > 0]
+                if games_to_create:
+                    games_created = 0
+                    next_game_number = len(st.session_state['games']) + 1
+                    
+                    # Sort games_to_create by day and time to ensure earliest time first
+                    def parse_time_for_creation(time_str):
+                        """Convert time string to comparable format for creation order"""
+                        try:
+                            from datetime import datetime
+                            time_obj = datetime.strptime(time_str, "%I:%M %p")
+                            return time_obj.time()
+                        except:
+                            return datetime.strptime("12:00 PM", "%I:%M %p").time()
+                    
+                    day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+                    games_to_create_sorted = sorted(games_to_create, key=lambda x: (
+                        day_order.index(x['Day']) if x['Day'] in day_order else 999,
+                        parse_time_for_creation(x['Time'])
+                    ))
+                    
+                    for game_slot in games_to_create_sorted:
+                        for game_num in range(game_slot['Games_Needed']):
+                            new_game = Game(
+                                date=game_slot['Day'],  # Will need to be updated individually
+                                time=game_slot['Time'],
+                                number=next_game_number,
+                                difficulty="TBD",  # To be determined individually
+                                location="TBD",  # To be determined individually
+                                min_refs=default_min_refs,
+                                max_refs=default_max_refs
+                            )
+                            st.session_state['games'].append(new_game)
+                            next_game_number += 1
+                            games_created += 1
+                    
+                    st.success(f"✅ Created {games_created} games! Scroll down to customize individual game details.")
+                    st.rerun()
                 else:
-                    st.info("🚧 Optimization algorithm coming in Phase 2!")
-            
-            # Manual scheduling tools
-            st.markdown("---")
-            st.subheader("🛠️ Manual Scheduling Tools")
-            st.markdown("*These features will be available in Phase 2:*")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown("**🎛️ Schedule Editor**")
-                st.markdown("- Drag and drop referee assignments")
-                st.markdown("- Real-time conflict detection")
-                st.markdown("- Fairness score tracking")
-                
-            with col2:
-                st.markdown("**📊 Analytics Dashboard**")
-                st.markdown("- Referee workload distribution")
-                st.markdown("- Coverage gap analysis")
-                st.markdown("- Schedule quality metrics")
-        
-        else:
-            st.info("📝 Set the number of games for each time slot above to proceed with scheduling.")
+                    st.warning("⚠️ Please set at least one game for a time slot.")
     
-    # Navigation buttons
+    with tab2:
+        st.markdown("#### 📊 Excel Input")
+        st.write("Upload a pre-filled Excel file with game details, or download a template to fill out.")
+        
+        # Download template button
+        if st.button("📥 Download Game Template", width='stretch'):
+            # Create sample Excel template
+            import pandas as pd
+            import io
+            
+            sample_data = {
+                'Game_Number': [1, 2, 3],
+                'Date': ['2024-01-15', '2024-01-15', '2024-01-16'],
+                'Time': ['6:30 PM', '7:30 PM', '6:30 PM'],
+                'Location': ['Boyden Ct 1', 'Boyden Ct 2', 'Boyden Ct 1'],
+                'Difficulty': ['Open - Top Gun', 'Open - Just Fun', 'Co-Rec - Just Fun'],
+                'Min_Refs': [2, 2, 2],
+                'Max_Refs': [3, 3, 3]
+            }
+            
+            template_df = pd.DataFrame(sample_data)
+            
+            # Create download
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                template_df.to_excel(writer, sheet_name='Games', index=False)
+            
+            st.download_button(
+                label="📥 Download Template",
+                data=output.getvalue(),
+                file_name="game_template.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+        
+        # File upload
+        uploaded_file = st.file_uploader(
+            "Choose Excel file",
+            type=['xlsx', 'xls'],
+            help="Upload the completed game template"
+        )
+        
+        if uploaded_file is not None:
+            try:
+                games_df = pd.read_excel(uploaded_file)
+                st.success(f"✅ Loaded {len(games_df)} games from Excel")
+                st.dataframe(games_df, width='stretch')
+                
+                if st.button("➕ Import Games", width='stretch', type="primary"):
+                    imported_count = 0
+                    for _, row in games_df.iterrows():
+                        new_game = Game(
+                            date=str(row['Date']),
+                            time=str(row['Time']),
+                            number=int(row['Game_Number']),
+                            difficulty=str(row['Difficulty']),
+                            location=str(row['Location']),
+                            min_refs=int(row['Min_Refs']),
+                            max_refs=int(row['Max_Refs'])
+                        )
+                        st.session_state['games'].append(new_game)
+                        imported_count += 1
+                    
+                    st.success(f"✅ Imported {imported_count} games successfully!")
+                    st.rerun()
+                    
+            except Exception as e:
+                st.error(f"❌ Error reading Excel file: {e}")
+        
+        st.info("💡 **Tip:** Download the template first, fill it out with your game details, then upload it here.")
+    
+    with tab3:
+        st.markdown("#### 🌐 Fusion Text Parser")
+        st.write("🚧 **Work in Progress** - Parse game data from Fusion website text")
+        
+        st.info("This feature will allow you to paste text from the Fusion website and automatically create games.")
+        
+        # Text input for fusion data
+        fusion_text = st.text_area(
+            "Paste Fusion text here:",
+            placeholder="""O-TG 01
+Sundays 9:30 pm @ Boyden Ct 4
+Sundays 9:30 pm @ Boyden Ct 5
+1 free agent
+5/5 teams""",
+            height=200,
+            help="Paste the text block from Fusion website"
+        )
+        
+        if fusion_text and st.button("🔄 Parse Fusion Text", width='stretch'):
+            st.warning("🚧 Parser not yet implemented. This will be available in a future update.")
+            st.code(fusion_text, language="text")
+    
+    # Show Add Game Form (outside tabs)
+    if st.session_state.get('show_add_game_form', False):
+        with st.form("add_game_form", clear_on_submit=True):
+            st.markdown("#### ➕ Add New Game")
+            
+            # Game details inputs
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Game Number
+                game_number = st.number_input(
+                    "Game Number",
+                    min_value=1,
+                    value=len(st.session_state['games']) + 1,
+                    help="Unique identifier for this game"
+                )
+                
+                # Day of Week Selection
+                day_of_week = st.selectbox(
+                    "Day of Week",
+                    ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+                    help="Select the day this game will be played"
+                )
+                
+                # Time Selection (30-minute intervals)
+                time_options = []
+                for hour in range(6, 24):  # 6 AM to 11:30 PM
+                    for minute in [0, 30]:
+                        time_obj = time(hour, minute)
+                        time_str = time_obj.strftime("%I:%M %p")
+                        time_options.append(time_str)
+                
+                game_time = st.selectbox(
+                    "Time",
+                    time_options,
+                    index=time_options.index("06:30 PM") if "06:30 PM" in time_options else 0,
+                    help="Select game start time (30-minute intervals)"
+                )
+                
+                # Location
+                location = st.text_input(
+                    "Location",
+                    value="Boyden Ct 1",
+                    help="Court or field where game will be played"
+                )
+            
+            with col2:
+                # Date (using day of week for now)
+                game_date = st.date_input(
+                    "Date",
+                    value=datetime.now().date(),
+                    help="Specific date for this game"
+                )
+                
+                # Difficulty/Division
+                difficulty = st.selectbox(
+                    "Difficulty/Division",
+                    ["Open - Just Fun", "Open - Top Gun", "Co-Rec - Just Fun", "Co-Rec - Top Gun", "Womens"],
+                    help="Game difficulty level or division type"
+                )
+                
+                # Min and Max Refs
+                col_min, col_max = st.columns(2)
+                with col_min:
+                    min_refs = st.number_input(
+                        "Min Refs",
+                        min_value=1,
+                        max_value=5,
+                        value=2,
+                        help="Minimum referees required"
+                    )
+                with col_max:
+                    max_refs = st.number_input(
+                        "Max Refs",
+                        min_value=1,
+                        max_value=5,
+                        value=3,
+                        help="Maximum referees allowed"
+                    )
+                
+                # Ensure max >= min
+                if max_refs < min_refs:
+                    st.warning("⚠️ Max refs must be >= Min refs")
+            
+            # Form buttons
+            col1, col2, col3 = st.columns([1, 1, 1])
+            with col1:
+                if st.form_submit_button("➕ Add Game", width='stretch'):
+                    # Validate inputs
+                    if max_refs >= min_refs:
+                        # Create new game
+                        new_game = Game(
+                            date=str(game_date),
+                            time=game_time,
+                            number=game_number,
+                            difficulty=difficulty,
+                            location=location,
+                            min_refs=min_refs,
+                            max_refs=max_refs
+                        )
+                        
+                        # Add to session state
+                        st.session_state['games'].append(new_game)
+                        st.session_state['show_add_game_form'] = False
+                        
+                        st.success(f"✅ Game {game_number} added successfully!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Max refs must be greater than or equal to Min refs")
+            
+            with col3:
+                if st.form_submit_button("❌ Cancel", width='stretch'):
+                    st.session_state['show_add_game_form'] = False
+                    st.rerun()
+
+    # Current Games Management Section
     st.markdown("---")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("⬅️ Back to Availability Setup", use_container_width=True):
-            st.switch_page("pages/Availability_Setup.py")
-    with col2:
-        if st.button("🏠 Back to Main", use_container_width=True):
-            st.switch_page("main.py")
+    st.subheader("📋 Current Games & Management")
+    
+    if st.session_state['games']:
+        # Games summary metrics
+        total_games = len(st.session_state['games'])
+        total_min_refs = sum(game.get_min_refs() for game in st.session_state['games'])
+        total_max_refs = sum(game.get_max_refs() for game in st.session_state['games'])
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Total Games", total_games)
+        with col2:
+            st.metric("Min Refs Needed", total_min_refs)
+        with col3:
+            st.metric("Max Refs Needed", total_max_refs)
+        with col4:
+            # Download current games as Excel
+            if st.button("📥 Download Games Excel"):
+                import pandas as pd
+                import io
+                
+                games_data = []
+                for game in st.session_state['games']:
+                    games_data.append({
+                        'Game_Number': game.get_number(),
+                        'Date': game.get_date(),
+                        'Time': game.get_time(),
+                        'Location': game.get_location(),
+                        'Difficulty': game.get_difficulty(),
+                        'Min_Refs': game.get_min_refs(),
+                        'Max_Refs': game.get_max_refs(),
+                    })
+                
+                games_df = pd.DataFrame(games_data)
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    games_df.to_excel(writer, sheet_name='Games', index=False)
+                
+                st.download_button(
+                    label="📥 Download",
+                    data=output.getvalue(),
+                    file_name="current_games.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="download_current_games"
+                )
+        
+        # Sort games by time for display (EARLIEST TIME FIRST)
+        def parse_time(time_str):
+            """Convert time string to comparable format"""
+            try:
+                from datetime import datetime
+                # Parse time string like "6:30 PM" or "10:30 AM"
+                time_obj = datetime.strptime(time_str, "%I:%M %p")
+                return time_obj.time()
+            except:
+                # If parsing fails, return a default time for sorting
+                return datetime.strptime("12:00 PM", "%I:%M %p").time()
+        
+        # Sort games by date first, then by time (EARLIEST TIME FIRST)
+        sorted_games_with_index = sorted(
+            enumerate(st.session_state['games']), 
+            key=lambda x: (x[1].get_date(), parse_time(x[1].get_time()))
+        )
+        
+        # Game editing interface
+        for display_idx, (original_idx, game) in enumerate(sorted_games_with_index):
+            with st.expander(f"🎮 Game #{game.get_number()} - {game.get_date()} {game.get_time()}", expanded=False):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # Editable fields
+                    new_number = st.number_input(
+                        "Game Number",
+                        min_value=1,
+                        value=game.get_number(),
+                        key=f"edit_number_{original_idx}"
+                    )
+                    
+                    new_date = st.text_input(
+                        "Date",
+                        value=game.get_date(),
+                        key=f"edit_date_{original_idx}"
+                    )
+                    
+                    new_time = st.text_input(
+                        "Time",
+                        value=game.get_time(),
+                        key=f"edit_time_{original_idx}"
+                    )
+                    
+                    new_location = st.text_input(
+                        "Location",
+                        value=game.get_location(),
+                        key=f"edit_location_{original_idx}"
+                    )
+                
+                with col2:
+                    difficulty_options = ["Open - Just Fun", "Open - Top Gun", "Co-Rec - Just Fun", "Co-Rec - Top Gun", "Womens", "TBD"]
+                    current_difficulty = game.get_difficulty()
+                    try:
+                        difficulty_index = difficulty_options.index(current_difficulty)
+                    except ValueError:
+                        difficulty_index = 5  # Default to "TBD" if not found
+                    
+                    new_difficulty = st.selectbox(
+                        "Difficulty",
+                        difficulty_options,
+                        index=difficulty_index,
+                        key=f"edit_difficulty_{original_idx}"
+                    )
+                    
+                    col_min, col_max = st.columns(2)
+                    with col_min:
+                        new_min_refs = st.number_input(
+                            "Min Refs",
+                            min_value=1,
+                            max_value=5,
+                            value=game.get_min_refs(),
+                            key=f"edit_min_refs_{original_idx}"
+                        )
+                    with col_max:
+                        new_max_refs = st.number_input(
+                            "Max Refs",
+                            min_value=1,
+                            max_value=5,
+                            value=game.get_max_refs(),
+                            key=f"edit_max_refs_{original_idx}"
+                        )
+                    
+                
+                # Action buttons
+                col1, col2, col3 = st.columns([1, 1, 1])
+                with col1:
+                    if st.button(f"💾 Update Game", key=f"update_{original_idx}"):
+                        if new_max_refs >= new_min_refs:
+                            # Update game attributes
+                            game.set_number(new_number)
+                            game.set_date(new_date)
+                            game.set_time(new_time)
+                            game.set_location(new_location)
+                            game.set_difficulty(new_difficulty)
+                            game.set_min_refs(new_min_refs)
+                            game.set_max_refs(new_max_refs)
+                            st.success("✅ Game updated!")
+                            st.rerun()
+                        else:
+                            st.error("❌ Max refs must be >= Min refs")
+                with col3:
+                    if st.button(f"🗑️ Delete Game", key=f"delete_{original_idx}"):
+                        # Find and remove the game object from the list
+                        st.session_state['games'].remove(game)
+                        st.success("✅ Game deleted!")
+                        st.rerun()
+        
+        # Add single game option at bottom
+        st.markdown("---")
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("➕ Add Another Game", width='stretch'):
+                st.session_state['show_add_game_form'] = True
+                st.rerun()
+        
+    else:
+        st.info("📋 **No games created yet!** Use the tabs above to create games, then they will appear here for editing.")
+    
