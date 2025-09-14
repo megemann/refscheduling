@@ -108,7 +108,7 @@ st.markdown("---")
 st.subheader("🔄 Scheduling Workflow")
 
 # Create workflow tabs
-workflow_tab1, workflow_tab2, workflow_tab3, workflow_tab4 = st.tabs(["Step 1: Manual Assignments", "Step 2: Parameters", "Step 3: Review", "Step 4: Coming Soon"])
+workflow_tab1, workflow_tab2, workflow_tab3, workflow_tab4 = st.tabs(["Step 1: Manual Assignments", "Step 2: Parameters", "Step 3: Review & Optimize", "Step 4: Results & Export"])
 
 with workflow_tab1:
     st.markdown("### 📅 Manual Referee Assignments")
@@ -367,11 +367,11 @@ with workflow_tab2:
         st.session_state['schedule_params'] = {
             'max_hours_per_week': 15,
             'max_hours_per_day': 6,
-            'weight_hour_balancing': 1.0,
-            'weight_skill_combo': 1.0,
-            'weight_low_skill_penalty': 1.0,
-            'weight_shift_block_penalty': 1.0,
-            'weight_effort_bonus': 1.0
+            'weight_hour_balancing': 2.5,
+            'weight_skill_combo': 2.5,
+            'weight_low_skill_penalty': 2.5,
+            'weight_shift_block_penalty': 2.5,
+            'weight_effort_bonus': 2.5
         }
     
     col1, col2 = st.columns(2)
@@ -399,55 +399,56 @@ with workflow_tab2:
     
     with col2:
         st.markdown("#### Optimization Weights")
-        st.markdown("*Higher values = more important*")
+        st.markdown("**Scale: 0-10** (0=disable, 2.5=baseline, 10=max emphasis)")
+        st.markdown("*Start with 2.5 for balanced objectives*")
         
         weight_hour_balancing = st.slider(
             "Hour Balancing",
             min_value=0.0,
-            max_value=5.0,
+            max_value=10.0,
             value=st.session_state['schedule_params']['weight_hour_balancing'],
-            step=0.1,
-            help="Importance of balancing hours across referees"
+            step=0.2,
+            help="Importance of balancing hours across referees (0=disable, 2.5=baseline, 10=max emphasis)"
         )
         st.session_state['schedule_params']['weight_hour_balancing'] = weight_hour_balancing
         
         weight_skill_combo = st.slider(
             "High-Low Skill Combination",
             min_value=0.0,
-            max_value=5.0,
+            max_value=10.0,
             value=st.session_state['schedule_params']['weight_skill_combo'],
-            step=0.1,
-            help="Importance of pairing high and low skill referees"
+            step=0.2,
+            help="Importance of pairing high and low skill referees (0=disable, 2.5=baseline, 10=max emphasis)"
         )
         st.session_state['schedule_params']['weight_skill_combo'] = weight_skill_combo
         
         weight_low_skill_penalty = st.slider(
             "Low Skill on High Games Penalty",
             min_value=0.0,
-            max_value=5.0,
+            max_value=10.0,
             value=st.session_state['schedule_params']['weight_low_skill_penalty'],
-            step=0.1,
-            help="Penalty for assigning low skill refs to high difficulty games"
+            step=0.2,
+            help="Penalty for assigning low skill refs to high difficulty games (0=disable, 2.5=baseline, 10=max emphasis)"
         )
         st.session_state['schedule_params']['weight_low_skill_penalty'] = weight_low_skill_penalty
         
         weight_shift_block_penalty = st.slider(
             "Shift Block Penalty",
             min_value=0.0,
-            max_value=5.0,
+            max_value=10.0,
             value=st.session_state['schedule_params']['weight_shift_block_penalty'],
-            step=0.1,
-            help="Penalty for assigning too many consecutive shifts"
+            step=0.2,
+            help="Penalty for assigning too many consecutive shifts (0=disable, 2.5=baseline, 10=max emphasis)"
         )
         st.session_state['schedule_params']['weight_shift_block_penalty'] = weight_shift_block_penalty
         
         weight_effort_bonus = st.slider(
             "High Effort Bonus",
             min_value=0.0,
-            max_value=5.0,
+            max_value=10.0,
             value=st.session_state['schedule_params']['weight_effort_bonus'],
-            step=0.1,
-            help="Bonus for giving more hours to high effort referees"
+            step=0.2,
+            help="Bonus for giving more hours to high effort referees (0=disable, 2.5=baseline, 10=max emphasis)"
         )
         st.session_state['schedule_params']['weight_effort_bonus'] = weight_effort_bonus
 
@@ -539,20 +540,120 @@ with workflow_tab3:
                 with st.spinner("Running optimization..."):
                     result = scheduler.optimize()
                 
-                if result:
-                    st.success("✅ Optimization completed! Check console/terminal for debug output.")
-                    st.info("💡 Debug information has been printed to the console where you're running Streamlit.")
+                if isinstance(result, dict) and result.get('success'):
+                    # Update session state with optimized results
+                    st.session_state['referees'] = result['refs']  # Updated referee objects with assignments
+                    st.session_state['optimization_complete'] = True
+                    st.session_state['optimization_assignments'] = result['assignments']
+                    
+                    st.success("✅ Optimization completed successfully!")
+                    st.info("📊 Navigate to the 'Results & Export' tab to view the schedule and export to Excel.")
+                    st.rerun()  # Refresh to show new results
                 else:
-                    st.error("❌ Optimization failed.")
+                    error_msg = result.get('error', 'Unknown error') if isinstance(result, dict) else 'Optimization failed'
+                    st.error(f"❌ Optimization failed: {error_msg}")
+                    st.info("💡 Check the console/terminal for detailed debug output.")
             except Exception as e:
                 st.error(f"❌ Error during optimization: {str(e)}")
         else:
             st.error("❌ Please ensure both referees and games are loaded before optimizing.")
 
 with workflow_tab4:
-    st.markdown("### 🚀 Optimization Engine")
-    st.markdown("*Coming Soon*")
-    st.info("This tab will contain the optimization algorithm and results.")
+    st.markdown("### 📊 Results & Export")
+    
+    # Check if optimization has been completed
+    if st.session_state.get('optimization_complete', False):
+        st.success("✅ Optimization completed! Results are ready for review.")
+        
+        # Import display utilities
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+        from utils.schedule_display import display_optimized_schedule, display_game_coverage
+        from utils.schedule_to_excel import generate_schedule_from_session_state
+        
+        # Display the optimized schedule
+        display_optimized_schedule(st.session_state['referees'], st.session_state['games'])
+        
+        st.markdown("---")
+        
+        # Display game coverage analysis
+        display_game_coverage(st.session_state['games'])
+        
+        st.markdown("---")
+        
+        # Export functionality
+        st.markdown("### 📤 Export Schedule")
+        st.markdown("Export your optimized schedule to Excel format for sharing and printing.")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("📊 Export to Excel", type="primary", width='stretch'):
+                try:
+                    # Generate Excel file
+                    output_path = generate_schedule_from_session_state(st.session_state)
+                    
+                    # Read the file for download
+                    with open(output_path, 'rb') as file:
+                        excel_data = file.read()
+                    
+                    # Provide download button
+                    st.download_button(
+                        label="💾 Download Schedule.xlsx",
+                        data=excel_data,
+                        file_name="referee_schedule.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                    
+                    st.success("✅ Excel file generated successfully!")
+                    
+                except Exception as e:
+                    st.error(f"❌ Error generating Excel file: {str(e)}")
+        
+        with col2:
+            if st.button("🔄 Re-run Optimization", width='stretch'):
+                # Clear optimization results to allow re-running
+                st.session_state['optimization_complete'] = False
+                if 'optimization_assignments' in st.session_state:
+                    del st.session_state['optimization_assignments']
+                st.info("💡 Navigate back to 'Step 3: Review' to re-run the optimization.")
+                st.rerun()
+        
+        # Show raw assignment data if needed (for debugging)
+        if st.checkbox("🔍 Show Raw Assignment Data", help="Display the raw optimization results for debugging"):
+            if 'optimization_assignments' in st.session_state:
+                assignments = st.session_state['optimization_assignments']
+                st.markdown("#### Raw Assignment Data")
+                st.json(assignments)
+            else:
+                st.info("No raw assignment data available.")
+    
+    else:
+        st.info("🔄 No optimization results yet. Complete the optimization in 'Step 3: Review' to see results here.")
+        
+        # Show current manual assignments if any
+        manual_assignments = []
+        if 'referees' in st.session_state:
+            for ref in st.session_state['referees']:
+                assigned_games = ref.get_assigned_games()
+                if assigned_games:
+                    manual_assignments.extend([
+                        {
+                            'Referee': ref.get_name(),
+                            'Game #': game_num,
+                            'Assignment Type': 'Manual'
+                        }
+                        for game_num in assigned_games
+                    ])
+        
+        if manual_assignments:
+            st.markdown("#### 📋 Current Manual Assignments")
+            manual_df = pd.DataFrame(manual_assignments)
+            st.dataframe(manual_df, width='stretch', hide_index=True)
+        else:
+            st.markdown("#### 📋 Current Manual Assignments")
+            st.info("No manual assignments made yet.")
 
 st.markdown("---")
 st.subheader("📊 Data Summary")

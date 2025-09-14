@@ -74,6 +74,26 @@ class Ref:
     def clear_assigned_games(self):
         """Clear all manually assigned games"""
         self.__assigned_games = []
+    
+    # Optimized assignment methods
+    def set_optimized_games(self, games):
+        """Set list of Game objects assigned by optimizer"""
+        self.__optimized_games = games if games else []
+    
+    def get_optimized_games(self):
+        """Get list of Game objects assigned by optimizer"""
+        return getattr(self, '_Ref__optimized_games', [])
+    
+    def add_optimized_game(self, game):
+        """Add a Game object to optimized assignments"""
+        if not hasattr(self, '_Ref__optimized_games'):
+            self.__optimized_games = []
+        if game not in self.__optimized_games:
+            self.__optimized_games.append(game)
+    
+    def clear_optimized_games(self):
+        """Clear all optimized game assignments"""
+        self.__optimized_games = []
 
     def __str__(self):
         return f"Ref: {self.__name}, Email: {self.__email}, Phone: {self.__phone_number}"

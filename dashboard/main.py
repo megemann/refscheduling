@@ -159,14 +159,27 @@ with col2:
         st.switch_page("pages/Game_Management.py")
 
 with col3:
-    st.markdown("""
-    **Step 3: Schedule Management**
-    - View all games
-    - View all referees
-    - Manage assignments
-    """)
-    if st.button("🔗 Go to Schedule Management", width='stretch'):
-        st.switch_page("pages/Schedule_Management.py")
+    # Check if optimization is complete
+    optimization_complete = st.session_state.get('optimization_complete', False)
+    
+    if optimization_complete:
+        st.markdown("""
+        **Step 3: Schedule Management** ✅
+        - ✅ Optimization complete!
+        - 📊 View optimized schedule
+        - 📤 Export to Excel
+        """)
+        if st.button("📊 View Schedule & Export", width='stretch'):
+            st.switch_page("pages/Schedule_Management.py")
+    else:
+        st.markdown("""
+        **Step 3: Schedule Management**
+        - View all games
+        - View all referees
+        - Run optimization
+        """)
+        if st.button("🔗 Go to Schedule Management", width='stretch'):
+            st.switch_page("pages/Schedule_Management.py")
 
 st.markdown("---")
 
@@ -196,12 +209,36 @@ except:
 # Check for games and referees in session state
 has_games = 'games' in st.session_state and len(st.session_state.get('games', [])) > 0
 has_referees = 'referees' in st.session_state and len(st.session_state.get('referees', [])) > 0
+optimization_complete = st.session_state.get('optimization_complete', False)
 
 # Show workflow progress
 st.markdown("---")
 st.subheader("🔄 Workflow Progress")
 
-if has_availability_data:
+if optimization_complete:
+    st.success("🎉 **Optimization Complete!** Your schedule is ready.")
+    
+    # Show optimization results summary
+    if has_referees and has_games:
+        total_assignments = sum(len(ref.get_optimized_games()) for ref in st.session_state['referees'])
+        assigned_refs = len([ref for ref in st.session_state['referees'] if ref.get_optimized_games()])
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Total Assignments", total_assignments)
+        with col2:
+            st.metric("Assigned Referees", assigned_refs)
+        with col3:
+            if assigned_refs > 0:
+                avg_games = total_assignments / assigned_refs
+                st.metric("Avg Games/Ref", f"{avg_games:.1f}")
+            else:
+                st.metric("Avg Games/Ref", "0")
+        with col4:
+            if st.button("📊 View Full Schedule", type="primary"):
+                st.switch_page("pages/Schedule_Management.py")
+
+elif has_availability_data:
     st.markdown("✅ **Step 1:** Availability data ready")
     if has_games:
         st.markdown("✅ **Step 2:** Games created")

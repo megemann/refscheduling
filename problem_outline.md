@@ -192,6 +192,24 @@ $$
 x_{r,d,h,g} \leq G_{d,h,g} \qquad \forall r \in R,\ \forall d \in D,\ \forall h \in H,\ \forall g \in G
 $$
 
+**User Constraints:** 
+
+_All games assigned by user must be scheduled:_
+
+For every user-assigned tuple $(r, d, h, g) \in A$:
+
+$$
+x_{r,d,h,g} = G_{d,h,g} \forall (r,d,h,g) \in A
+$$
+
+_Hours for a referee must be less than the user defined value:_
+
+For every user-assigned bound $(r) \in \text{MAX\_HR}$:
+
+$$
+\sum_{d \in D} \sum_{h \in H} \sum_{g \in G} x_{r,d,h,g} \leq \text{MAX\_HR}_r \qquad \forall r \in R
+$$
+
 **Optimization Criteria:**
 
 We start by defining useful metrics and functions
@@ -223,14 +241,27 @@ with $\sum_{g \in G} x_{r,d,h-1,g} = 0$ for the first hour of each day.
 
 ---
 
-_Penalizing the difference of each referees hours away from the mean_
+_Penalizing the mean absolute deviation of each referee's hours from the mean, only for referees not at their cap_
+
+Let $C$ be the set of referees not at their cap:
 $$
-b(x) =  \sqrt{\frac{1}{N} \sum_{i=1}^{N} (h_i- \bar{h})^2}
+C = \{ i \in R \mid h_i < \text{MAX\_HR}_i \}
 $$
-   
-_Awarding higher effort with more hours_
+
+Introduce auxiliary variables $d_i \geq 0$ for each $i \in C$ such that:
 $$
-e(x) = \frac{1}{N}\sum_{i \in R}E_{i}h_i
+d_i \geq h_i - \bar{h} \\
+d_i \geq \bar{h} - h_i \\
+\forall i \in C
+$$
+
+Then, the balancing penalty is:
+$$
+b(x) = \frac{1}{|C|} \sum_{i \in C} d_i
+$$
+_Awarding higher effort with more hours, only for referees not at their cap:_
+$$
+e(x) = \frac{1}{|C|}\sum_{i \in C}E_{i}h_i
 $$
 
 _Awarding lesser number of continuous time blocks:_
@@ -259,3 +290,19 @@ $$
 u_{d,h,g} \geq GEx_{d,h,g}\sum_{i \in R} x_{i,d,h,g} - \sum_{i \in R} REx_i \, x_{i,d,h,g}, \quad u_{d,h,g} \geq 0 \qquad \forall d \in D,\ \forall h \in H,\ \forall g \in G
 $$
 
+where `u_{d,h,g}` represents the **skill deficit penalty** - the amount by which the assigned referees' average experience falls short of the game's required difficulty level. When assigned referees have sufficient skill, `u_{d,h,g} = 0`. When they have insufficient skill, `u_{d,h,g} > 0` and contributes to the penalty.
+
+**Final Objective Function**
+
+$$
+MAX \{obj(x) = w_1e(x) - w_2b(x) - w_3s(x) - w_4tb(x) + w_5p(x)\}
+$$
+
+where:
+- `w_1` = weight for effort bonus (maximize high-effort referees)
+- `w_2` = weight for hour balancing penalty (minimize hour imbalance) 
+- `w_3` = weight for low skill penalty (minimize skill mismatches)
+- `w_4` = weight for shift block penalty (minimize consecutive assignments)
+- `w_5` = weight for skill combination bonus (maximize diverse skill pairs)
+
+Note: some terms are divided by means for normalization, but are omitted to improve readability
