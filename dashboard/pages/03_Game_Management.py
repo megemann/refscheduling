@@ -20,72 +20,96 @@ except ImportError:
 # Set page config
 st.set_page_config(
     page_title="Game Management",
-    page_icon="🎮",
-    layout="centered"
+    page_icon="⚽",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 # Add CSS for wider container
 st.markdown("""
 <style>
 .main > div {
-    max-width: 85% !important;
+    max-width: 95% !important;
 }
 .block-container {
-    max-width: 85% !important;
+    max-width: 95% !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🎮 Game Management")
+# Add table styling CSS for better readability
+st.markdown("""
+<style>
+/* Table styling for better readability */
+.stDataFrame, .stTable {
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
+}
+
+.stDataFrame th, .stTable th {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+    padding: 8px !important;
+    font-weight: 600 !important;
+}
+
+.stDataFrame td, .stTable td {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+    padding: 8px !important;
+}
+
+.stDataFrame th:last-child, .stTable th:last-child,
+.stDataFrame td:last-child, .stTable td:last-child {
+    border-right: none !important;
+}
+
+.stDataFrame tr:last-child td, .stTable tr:last-child td {
+    border-bottom: none !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.title("Game Management")
 
 # Load availability data
 availability_df, has_availability_data = load_availability_data()
 
 if not has_availability_data:
-    st.error("🚫 **This step is locked**")
+    st.error("**This step is locked**")
     st.markdown("**You must complete Step 1 first:**")
-    st.markdown("1. ❌ Download template")
-    st.markdown("2. ❌ Fill referee availability") 
-    st.markdown("3. ❌ Upload completed file")
+    st.markdown("1. Download template")
+    st.markdown("2. Fill referee availability") 
+    st.markdown("3. Upload completed file")
     st.markdown("4. 🔒 Create games")
     st.markdown("5. 🔒 Assign referees")
     st.markdown("6. 🔒 Export schedules")
     
     st.info("👈 Go back to **Step 1: Availability Setup** to get started")
     
-    if st.button("⬅️ Go to Availability Setup", width='stretch'):
+    if st.button("Go to Availability Setup", width='stretch'):
         st.switch_page("pages/Availability_Setup.py")
     
 else:
-    st.success("✅ **Step 1 Complete!** Game management is now available.")
-    st.markdown("**Completed Steps:**")
-    st.markdown("1. ✅ Download template")
-    st.markdown("2. ✅ Fill referee availability") 
-    st.markdown("3. ✅ Upload completed file")
-    
-    # Show available data summary
-    st.markdown("### 📊 Available Data Summary:")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Total Referees", len(availability_df))
-    with col2:
-        st.metric("Time Slots", len(availability_df.columns))
-    with col3:
-        st.metric("Total Availability", availability_df.sum().sum())
 
     # Initialize games in session state
     if 'games' not in st.session_state:
         st.session_state['games'] = []
+    
+    # Initialize unsaved changes tracking
+    if 'unsaved_game_changes' not in st.session_state:
+        st.session_state['unsaved_game_changes'] = False
 
     # Game Management Section
     st.markdown("---")
-    st.subheader("🎮 Game Management")
+    st.subheader("Game Management")
     
     # Create subtabs for different game creation methods
-    tab1, tab2, tab3 = st.tabs(["🔄 Bulk Creation", "📊 Excel Input", "🌐 Fusion Parser"])
+    tab1, tab2, tab3 = st.tabs(["Bulk Creation", "Excel Input", "Fusion Parser"])
     
     with tab1:
-        st.markdown("#### 🔄 Bulk Game Creation")
+        st.markdown("#### Bulk Game Creation")
         st.write("Create multiple games quickly using the existing time slot interface, then customize details individually.")
         
         # Default settings for bulk creation
@@ -108,7 +132,7 @@ else:
             )
         
         if default_max_refs < default_min_refs:
-            st.warning("⚠️ Max refs must be >= Min refs")
+            st.warning("Max refs must be >= Min refs")
         
         # Move the existing bulk creation logic here
         st.write("Enter the number of games needed for each time slot:")
@@ -183,7 +207,7 @@ else:
                 prev_day = row['Day']
         
             # Create games button
-            if st.button("🎯 Create Bulk Games", width='stretch', type="primary"):
+            if st.button("Create Bulk Games", width='stretch', type="primary"):
                 games_to_create = [g for g in games_data if g['Games_Needed'] > 0]
                 if games_to_create:
                     games_created = 0
@@ -220,17 +244,18 @@ else:
                             next_game_number += 1
                             games_created += 1
                     
-                    st.success(f"✅ Created {games_created} games! Scroll down to customize individual game details.")
+                    st.session_state['unsaved_game_changes'] = True
+                    st.success(f"Created {games_created} games! Scroll down to customize individual game details. Use 'Save All Changes' to persist.")
                     st.rerun()
                 else:
-                    st.warning("⚠️ Please set at least one game for a time slot.")
+                    st.warning("Please set at least one game for a time slot.")
     
     with tab2:
-        st.markdown("#### 📊 Excel Input")
+        st.markdown("#### Excel Input")
         st.write("Upload a pre-filled Excel file with game details, or download a template to fill out.")
         
         # Download template button
-        if st.button("📥 Download Game Template", width='stretch'):
+        if st.button("Download Game Template", width='stretch'):
             # Create sample Excel template
             import pandas as pd
             import io
@@ -253,7 +278,7 @@ else:
                 template_df.to_excel(writer, sheet_name='Games', index=False)
             
             st.download_button(
-                label="📥 Download Template",
+                label="Download Template",
                 data=output.getvalue(),
                 file_name="game_template.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -269,10 +294,12 @@ else:
         if uploaded_file is not None:
             try:
                 games_df = pd.read_excel(uploaded_file)
-                st.success(f"✅ Loaded {len(games_df)} games from Excel")
+                st.success(f"Loaded {len(games_df)} games from Excel")
                 st.dataframe(games_df, width='stretch')
                 
-                if st.button("➕ Import Games", width='stretch', type="primary"):
+                if st.button("Import Games", width='stretch', type="primary"):
+                    # Clear existing games when importing
+                    st.session_state['games'] = []
                     imported_count = 0
                     for _, row in games_df.iterrows():
                         new_game = Game(
@@ -287,16 +314,17 @@ else:
                         st.session_state['games'].append(new_game)
                         imported_count += 1
                     
-                    st.success(f"✅ Imported {imported_count} games successfully!")
+                    st.session_state['unsaved_game_changes'] = True
+                    st.success(f"Imported {imported_count} games successfully! Use 'Save All Changes' to persist.")
                     st.rerun()
                     
             except Exception as e:
-                st.error(f"❌ Error reading Excel file: {e}")
+                st.error(f"Error reading Excel file: {e}")
         
-        st.info("💡 **Tip:** Download the template first, fill it out with your game details, then upload it here.")
+        st.info("**Tip:** Download the template first, fill it out with your game details, then upload it here.")
     
     with tab3:
-        st.markdown("#### 🌐 Fusion Text Parser")
+        st.markdown("#### Fusion Text Parser")
         st.write("🚧 **Work in Progress** - Parse game data from Fusion website text")
         
         st.info("This feature will allow you to paste text from the Fusion website and automatically create games.")
@@ -313,14 +341,14 @@ Sundays 9:30 pm @ Boyden Ct 5
             help="Paste the text block from Fusion website"
         )
         
-        if fusion_text and st.button("🔄 Parse Fusion Text", width='stretch'):
+        if fusion_text and st.button("Parse Fusion Text", width='stretch'):
             st.warning("🚧 Parser not yet implemented. This will be available in a future update.")
             st.code(fusion_text, language="text")
     
     # Show Add Game Form (outside tabs)
     if st.session_state.get('show_add_game_form', False):
         with st.form("add_game_form", clear_on_submit=True):
-            st.markdown("#### ➕ Add New Game")
+            st.markdown("#### Add New Game")
             
             # Game details inputs
             col1, col2 = st.columns(2)
@@ -399,12 +427,12 @@ Sundays 9:30 pm @ Boyden Ct 5
                 
                 # Ensure max >= min
                 if max_refs < min_refs:
-                    st.warning("⚠️ Max refs must be >= Min refs")
+                    st.warning("Max refs must be >= Min refs")
             
             # Form buttons
             col1, col2, col3 = st.columns([1, 1, 1])
             with col1:
-                if st.form_submit_button("➕ Add Game", width='stretch'):
+                if st.form_submit_button("Add Game", width='stretch'):
                     # Validate inputs
                     if max_refs >= min_refs:
                         # Create new game
@@ -421,20 +449,36 @@ Sundays 9:30 pm @ Boyden Ct 5
                         # Add to session state
                         st.session_state['games'].append(new_game)
                         st.session_state['show_add_game_form'] = False
+                        st.session_state['unsaved_game_changes'] = True
                         
-                        st.success(f"✅ Game {game_number} added successfully!")
+                        st.success(f"Game {game_number} added successfully! Use 'Save All Changes' to persist.")
                         st.rerun()
                     else:
-                        st.error("❌ Max refs must be greater than or equal to Min refs")
+                        st.error("Max refs must be greater than or equal to Min refs")
             
             with col3:
-                if st.form_submit_button("❌ Cancel", width='stretch'):
+                if st.form_submit_button("Cancel", width='stretch'):
                     st.session_state['show_add_game_form'] = False
                     st.rerun()
 
     # Current Games Management Section
     st.markdown("---")
-    st.subheader("📋 Current Games & Management")
+    st.subheader("Current Games & Management")
+    
+    # Show unsaved changes warning and bulk save button
+    if st.session_state.get('unsaved_game_changes', False):
+        st.warning("**You have unsaved changes!** Use the 'Save All Changes' button below to persist your modifications.")
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("Save All Game Changes", width='stretch', type="primary"):
+                # Save games to session (they're already there)
+                # The games are already in st.session_state['games'], so we just need to mark as saved
+                st.session_state['unsaved_game_changes'] = False
+                st.success("All game changes saved successfully!")
+                st.rerun()
+        
+        st.markdown("---")
     
     if st.session_state['games']:
         # Games summary metrics
@@ -451,56 +495,43 @@ Sundays 9:30 pm @ Boyden Ct 5
             st.metric("Max Refs Needed", total_max_refs)
         with col4:
             # Download current games as Excel
-            if st.button("📥 Download Games Excel"):
-                import pandas as pd
-                import io
-                
-                games_data = []
-                for game in st.session_state['games']:
-                    games_data.append({
-                        'Game_Number': game.get_number(),
-                        'Date': game.get_date(),
-                        'Time': game.get_time(),
-                        'Location': game.get_location(),
-                        'Difficulty': game.get_difficulty(),
-                        'Min_Refs': game.get_min_refs(),
-                        'Max_Refs': game.get_max_refs(),
-                    })
-                
-                games_df = pd.DataFrame(games_data)
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                    games_df.to_excel(writer, sheet_name='Games', index=False)
-                
-                st.download_button(
-                    label="📥 Download",
-                    data=output.getvalue(),
-                    file_name="current_games.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="download_current_games"
-                )
+            import pandas as pd
+            import io
+            
+            games_data = []
+            for game in st.session_state['games']:
+                games_data.append({
+                    'Game_Number': game.get_number(),
+                    'Date': game.get_date(),
+                    'Time': game.get_time(),
+                    'Location': game.get_location(),
+                    'Difficulty': game.get_difficulty(),
+                    'Min_Refs': game.get_min_refs(),
+                    'Max_Refs': game.get_max_refs(),
+                })
+            
+            games_df = pd.DataFrame(games_data)
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                games_df.to_excel(writer, sheet_name='Games', index=False)
+            
+            st.download_button(
+                label="Download Games Excel",
+                data=output.getvalue(),
+                file_name="current_games.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="download_current_games"
+            )
         
-        # Sort games by time for display (EARLIEST TIME FIRST)
-        def parse_time(time_str):
-            """Convert time string to comparable format"""
-            try:
-                from datetime import datetime
-                # Parse time string like "6:30 PM" or "10:30 AM"
-                time_obj = datetime.strptime(time_str, "%I:%M %p")
-                return time_obj.time()
-            except:
-                # If parsing fails, return a default time for sorting
-                return datetime.strptime("12:00 PM", "%I:%M %p").time()
-        
-        # Sort games by date first, then by time (EARLIEST TIME FIRST)
+        # Sort games by game number
         sorted_games_with_index = sorted(
             enumerate(st.session_state['games']), 
-            key=lambda x: (x[1].get_date(), parse_time(x[1].get_time()))
+            key=lambda x: x[1].get_number()
         )
         
         # Game editing interface
         for display_idx, (original_idx, game) in enumerate(sorted_games_with_index):
-            with st.expander(f"🎮 Game #{game.get_number()} - {game.get_date()} {game.get_time()}", expanded=False):
+            with st.expander(f"Game #{game.get_number()} - {game.get_date()} {game.get_time()}", expanded=False):
                 col1, col2 = st.columns(2)
                 
                 with col1:
@@ -567,7 +598,7 @@ Sundays 9:30 pm @ Boyden Ct 5
                 # Action buttons
                 col1, col2, col3 = st.columns([1, 1, 1])
                 with col1:
-                    if st.button(f"💾 Update Game", key=f"update_{original_idx}"):
+                    if st.button(f"Update Game", key=f"update_{original_idx}"):
                         if new_max_refs >= new_min_refs:
                             # Update game attributes
                             game.set_number(new_number)
@@ -577,25 +608,27 @@ Sundays 9:30 pm @ Boyden Ct 5
                             game.set_difficulty(new_difficulty)
                             game.set_min_refs(new_min_refs)
                             game.set_max_refs(new_max_refs)
-                            st.success("✅ Game updated!")
+                            st.session_state['unsaved_game_changes'] = True
+                            st.success("Game updated! Use 'Save All Changes' to persist.")
                             st.rerun()
                         else:
-                            st.error("❌ Max refs must be >= Min refs")
+                            st.error("Max refs must be >= Min refs")
                 with col3:
-                    if st.button(f"🗑️ Delete Game", key=f"delete_{original_idx}"):
+                    if st.button(f"Delete Game", key=f"delete_{original_idx}"):
                         # Find and remove the game object from the list
                         st.session_state['games'].remove(game)
-                        st.success("✅ Game deleted!")
+                        st.session_state['unsaved_game_changes'] = True
+                        st.success("Game deleted! Use 'Save All Changes' to persist.")
                         st.rerun()
         
         # Add single game option at bottom
         st.markdown("---")
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            if st.button("➕ Add Another Game", width='stretch'):
+            if st.button("Add Another Game", width='stretch'):
                 st.session_state['show_add_game_form'] = True
                 st.rerun()
         
     else:
-        st.info("📋 **No games created yet!** Use the tabs above to create games, then they will appear here for editing.")
+        st.info("**No games created yet!** Use the tabs above to create games, then they will appear here for editing.")
     

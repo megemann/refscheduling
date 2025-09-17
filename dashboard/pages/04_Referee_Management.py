@@ -14,37 +14,103 @@ from phase2.Ref import Ref
 # Set page config
 st.set_page_config(
     page_title="Referee Management",
-    page_icon="👥",
-    layout="centered"
+    page_icon="👤",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# Add CSS for wider container
+# Add CSS for wider container and page border
 st.markdown("""
 <style>
 .main > div {
-    max-width: 85% !important;
+    max-width: 95% !important;
+    border: 2px solid white !important;
+    border-radius: 12px !important;
+    padding: 20px !important;
+    margin: 10px auto !important;
 }
 .block-container {
-    max-width: 85% !important;
+    max-width: 95% !important;
+    border: 2px solid white !important;
+    border-radius: 12px !important;
+    padding: 20px !important;
+    margin: 10px auto !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("👥 Referee Management")
+# Add table styling CSS for better readability
+st.markdown("""
+<style>
+/* Table styling for better readability */
+.stDataFrame, .stTable {
+    border: 1px solid white !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
+}
+
+.stDataFrame th, .stTable th {
+    border-bottom: 1px solid white !important;
+    border-right: 1px solid white !important;
+    padding: 8px !important;
+    font-weight: 600 !important;
+}
+
+.stDataFrame td, .stTable td {
+    border-bottom: 1px solid white !important;
+    border-right: 1px solid white !important;
+    padding: 8px !important;
+}
+
+.stDataFrame th:last-child, .stTable th:last-child,
+.stDataFrame td:last-child, .stTable td:last-child {
+    border-right: none !important;
+}
+
+.stDataFrame tr:last-child td, .stTable tr:last-child td {
+    border-bottom: none !important;
+}
+
+/* Referee list container styling - target the Current Referees tab content */
+div[data-testid="stTabContent"] > div {
+    border: 2px solid white !important;
+    border-radius: 8px !important;
+    padding: 16px !important;
+    margin: 10px 0 !important;
+}
+
+/* Referee list row styling with thicker separators */
+.referee-row {
+    border-bottom: 3px solid white;
+    padding: 12px 8px;
+    margin-bottom: 8px;
+}
+
+.referee-row:last-child {
+    border-bottom: 3px solid white;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.title("Referee Management")
 st.markdown("Manage referee profiles, skills, and preferences")
 
+# Initialize unsaved changes tracking
+if 'unsaved_ref_changes' not in st.session_state:
+    st.session_state['unsaved_ref_changes'] = False
+
 # Referee Data Management Tabs
-tab1, tab2, tab3 = st.tabs(["👥 Current Referees", "📊 Excel Import/Export", "➕ Add Referee"])
+tab1, tab2, tab3 = st.tabs(["Current Referees", "Excel Import/Export", "Add Referee"])
 
 with tab2:
-    st.markdown("#### 📊 Excel Import/Export")
+    st.markdown("#### Excel Import/Export")
     st.write("Download a template, upload referee data, or export current referee information.")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("##### 📥 Download Template")
-        if st.button("📥 Download Referee Template", width='stretch'):
+        st.markdown("##### Download Template")
+        if st.button("Download Referee Template", width='stretch'):
             import io
             
             # Create sample referee data template
@@ -70,16 +136,16 @@ with tab2:
                 template_df.to_excel(writer, sheet_name='Referees', index=False)
             
             st.download_button(
-                label="📥 Download Template",
+                label="Download Template",
                 data=output.getvalue(),
                 file_name="referee_template.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
     
     with col2:
-        st.markdown("##### 📤 Export Current Data")
+        st.markdown("##### Export Current Data")
         if 'referees' in st.session_state and st.session_state['referees']:
-            if st.button("📤 Export Current Referees", width='stretch'):
+            if st.button("Export Current Referees", width='stretch'):
                 import io
                 
                 # Create referee data for export
@@ -114,7 +180,7 @@ with tab2:
                     export_df.to_excel(writer, sheet_name='Referees', index=False)
                 
                 st.download_button(
-                    label="📤 Download Current Data",
+                    label="Download Current Data",
                     data=output.getvalue(),
                     file_name="current_referees.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -124,7 +190,7 @@ with tab2:
             st.info("No referee data to export")
     
     st.markdown("---")
-    st.markdown("##### 📂 Upload Referee Data")
+    st.markdown("##### Upload Referee Data")
     
     # File upload
     uploaded_file = st.file_uploader(
@@ -136,10 +202,10 @@ with tab2:
     if uploaded_file is not None:
         try:
             refs_df = pd.read_excel(uploaded_file)
-            st.success(f"✅ Loaded {len(refs_df)} referees from Excel")
+            st.success(f"Loaded {len(refs_df)} referees from Excel")
             st.dataframe(refs_df, width='stretch')
             
-            if st.button("➕ Import Referees", width='stretch', type="primary"):
+            if st.button("Import Referees", width='stretch', type="primary"):
                 imported_count = 0
                 new_referees = []
                 
@@ -175,20 +241,21 @@ with tab2:
                     new_referees.append(new_ref)
                     imported_count += 1
                 
-                # Store in session state
+                # Clear existing referees and store new ones
                 st.session_state['referees'] = new_referees
                 st.session_state['time_columns'] = time_columns
+                st.session_state['unsaved_ref_changes'] = True
                 
-                st.success(f"✅ Imported {imported_count} referees successfully!")
+                st.success(f"Imported {imported_count} referees successfully! Use 'Save All Changes' to persist.")
                 st.rerun()
                 
         except Exception as e:
-            st.error(f"❌ Error reading Excel file: {e}")
+            st.error(f"Error reading Excel file: {e}")
     
-    st.info("💡 **Tip:** Download the template first, fill it out with referee details and availability (1=available, 0=not available), then upload it here.")
+    st.info("**Tip:** Download the template first, fill it out with referee details and availability (1=available, 0=not available), then upload it here.")
 
 with tab3:
-    st.markdown("#### ➕ Add New Referee")
+    st.markdown("#### Add New Referee")
     st.write("Manually add a single referee with availability information.")
     
     with st.form("add_referee_form", clear_on_submit=True):
@@ -223,7 +290,7 @@ with tab3:
                         available = st.checkbox(time_slot.replace('_', ' '), key=f"avail_{i+j}")
                         availability.append(1 if available else 0)
         
-        if st.form_submit_button("➕ Add Referee", width='stretch'):
+        if st.form_submit_button("Add Referee", width='stretch'):
             if ref_name:
                 new_ref = Ref(
                     name=ref_name,
@@ -247,20 +314,52 @@ with tab3:
                     st.session_state['time_columns'] = time_columns
                 
                 st.session_state['referees'].append(new_ref)
-                st.success(f"✅ Added referee: {ref_name}")
+                st.session_state['unsaved_ref_changes'] = True
+                st.success(f"Added referee: {ref_name}! Use 'Save All Changes' to persist.")
                 st.rerun()
             else:
-                st.error("❌ Please enter a referee name")
+                st.error("Please enter a referee name")
 
 with tab1:
-    st.markdown("#### 👥 Current Referees")
+    st.markdown("#### Current Referees")
+    
+    # Show unsaved changes warning and bulk save button
+    if st.session_state.get('unsaved_ref_changes', False):
+        st.warning("**You have unsaved changes!** Use the 'Save All Changes' button below to persist your modifications.")
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("Save All Referee Changes", width='stretch', type="primary"):
+                # Update the CSV file with current referee data
+                try:
+                    if st.session_state.get('referees') and st.session_state.get('time_columns'):
+                        import pandas as pd
+                        
+                        # Create referee matrix for CSV
+                        ref_matrix = {}
+                        for ref in st.session_state['referees']:
+                            ref_name = ref.get_name().replace(' ', '_').replace(',', '').replace('.', '').replace('(', '').replace(')', '')
+                            if hasattr(ref, 'get_availability'):
+                                ref_matrix[ref_name] = ref.get_availability()
+                        
+                        if ref_matrix:
+                            availability_df = pd.DataFrame.from_dict(ref_matrix, orient='index', columns=st.session_state['time_columns'])
+                            availability_df.to_csv('DATA/Convert.csv')
+                        
+                        st.session_state['unsaved_ref_changes'] = False
+                        st.success("All referee changes saved successfully!")
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"Error saving referee data: {e}")
+        
+        st.markdown("---")
 
     # Auto-load referee data if availability exists but referees don't
     if ('referees' not in st.session_state or not st.session_state['referees']):
         try:
             availability_df, has_data = load_availability_data()
             if has_data:
-                st.info("🔄 Loading referee data from availability file...")
+                st.info("Loading referee data from availability file...")
                 referees = []
                 time_columns = list(availability_df.columns)
                 
@@ -273,10 +372,10 @@ with tab1:
                 # Store in session state
                 st.session_state['referees'] = referees
                 st.session_state['time_columns'] = time_columns
-                st.success(f"✅ Loaded {len(referees)} referees!")
+                st.success(f"Loaded {len(referees)} referees!")
                 st.rerun()
         except Exception as e:
-            st.warning(f"⚠️ Could not load referee data: {str(e)}")
+            st.warning(f"Could not load referee data: {str(e)}")
 
     # Check if we have referee data in session state
     if 'referees' in st.session_state and st.session_state['referees']:
@@ -296,23 +395,24 @@ with tab1:
             st.metric("Avg Experience", f"{avg_experience:.1f}")
         
         st.markdown("---")
-        st.markdown(f"##### 📋 Referee List ({len(referees)} total)")
+        st.markdown(f"##### Referee List ({len(referees)} total)")
         
         # Display each referee in markdown format
         for i, ref in enumerate(referees, 1):
             try:
-                # Use a container for each referee for better layout
+                # Use a container for each referee with custom styling
+                st.markdown('<div class="referee-row">', unsafe_allow_html=True)
                 with st.container():
                     cols = st.columns([2, 2, 2, 1, 1, 1])
                     with cols[0]:
                         name = ref.get_name() if hasattr(ref, 'get_name') else str(ref)
                         st.markdown(f"**{name}**")
                     with cols[1]:
-                        email = ref.get_email() if hasattr(ref, 'get_email') else "No email"
-                        st.markdown(f"📧 {email}")
+                        email = ref.get_email() if hasattr(ref, 'get_email') else ""
+                        st.markdown(f"{email}")
                     with cols[2]:
-                        phone = ref.get_phone_number() if hasattr(ref, 'get_phone_number') else "No phone"
-                        st.markdown(f"📞 {phone}")
+                        phone = ref.get_phone_number() if hasattr(ref, 'get_phone_number') else ""
+                        st.markdown(f"{phone}")
                     with cols[3]:
                         # Experience input (1-5 scale, default to current value if exists)
                         current_exp = 3
@@ -323,15 +423,16 @@ with tab1:
                                 current_exp = 3
                         
                         experience = st.number_input(
-                            f"Experience (1-5)",
+                            "Experience",
                             min_value=1, max_value=5,
                             value=current_exp,
-                            key=f"exp_{i}",
-                            help="1 = Beginner, 5 = Expert"
+                            key=f"exp_{i}"
                         )
                         if hasattr(ref, 'set_experience'):
                             try:
-                                ref.set_experience(experience)
+                                if experience != current_exp:
+                                    ref.set_experience(experience)
+                                    st.session_state['unsaved_ref_changes'] = True
                             except:
                                 pass
                     with cols[4]:
@@ -344,33 +445,37 @@ with tab1:
                                 current_effort = 3
                         
                         effort = st.number_input(
-                            f"Effort (1-5)",
+                            "Effort",
                             min_value=1, max_value=5,
                             value=current_effort,
-                            key=f"eff_{i}",
-                            help="1 = Low effort, 5 = High effort"
+                            key=f"eff_{i}"
                         )
                         if hasattr(ref, 'set_effort'):
                             try:
-                                ref.set_effort(effort)
+                                if effort != current_effort:
+                                    ref.set_effort(effort)
+                                    st.session_state['unsaved_ref_changes'] = True
                             except:
                                 pass
                     with cols[5]:
                         # Remove referee button
-                        if st.button("➖", key=f"remove_{i}", help="Remove referee"):
+                        if st.button("Remove", key=f"remove_{i}"):
                             # Remove referee from session state and rerun
                             st.session_state['referees'].pop(i-1)
+                            st.session_state['unsaved_ref_changes'] = True
                             st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
             except Exception as e:
                 st.error(f"Error displaying referee {i}: {e}")
+                st.markdown('</div>', unsafe_allow_html=True)
 
     else:
-        st.info("📋 **No referee data found**")
+        st.info("**No referee data found**")
         st.markdown("### To load referee data:")
         st.markdown("1. Go to **Availability Setup** and upload referee availability")
         st.markdown("2. Or use the **Excel Import/Export** tab to upload referee data")
         st.markdown("3. Or use the **Add Referee** tab to add referees manually")
         
-        if st.button("⬅️ Go to Availability Setup", width='stretch'):
+        if st.button("Go to Availability Setup", width='stretch'):
             st.switch_page("pages/Availability_Setup.py")
 

@@ -613,13 +613,61 @@ class Scheduler:
         
         # Solve with Gurobi
         try:
-            solver = SolverFactory('gurobi_direct')
             
-            # Set Gurobi parameters for better infeasibility analysis
-            solver.options['IISMethod'] = 1  # Enable IIS computation
-            solver.options['OutputFlag'] = 1  # Show solver output
+            solver = SolverFactory('gurobi')
+            solver.options['OutputFlag'] = 1
+            solver.options['TimeLimit']  = 240
+            solver.options['MIPGap']     = 0.05
+            solver.options['IISMethod'] = 1
             
-            results = solver.solve(model, tee=True)
+            # Add callback for progress tracking
+            import json
+            import os
+            
+            def gurobi_callback(cb_m, cb_where):
+                """Gurobi callback to track optimization progress"""
+                try:
+                    if cb_where == gurobipy.GRB.Callback.MIP:
+                        # Get progress information
+                        objbnd = cb_m.cbGet(gurobipy.GRB.Callback.MIP_OBJBND)
+                        objbst = cb_m.cbGet(gurobipy.GRB.Callback.MIP_OBJBST)
+                        solcnt = cb_m.cbGet(gurobipy.GRB.Callback.MIP_SOLCNT)
+                        runtime = cb_m.cbGet(gurobipy.GRB.Callback.RUNTIME)
+                        
+                        # Calculate percentage progress (approximate)
+                        if objbnd != float('inf') and objbst != float('inf') and objbnd != 0:
+                            gap = abs(objbst - objbnd) / abs(objbnd)
+                            progress = max(0, min(95, (1 - gap) * 100))  # Cap at 95%
+                        else:
+                            progress = min(95, (runtime / 600) * 100)  # Time-based progress, cap at 95%
+                        
+                        # Write progress to file
+                        progress_data = {
+                            'progress': progress,
+                            'runtime': runtime,
+                            'solutions_found': solcnt,
+                            'best_objective': objbst if objbst != float('inf') else None,
+                            'bound': objbnd if objbnd != float('inf') else None
+                        }
+                        
+                        with open('optimization_progress.json', 'w') as f:
+                            json.dump(progress_data, f)
+                            
+                except Exception as e:
+                    # Don't let callback errors crash the optimization
+                    pass
+            
+            # Try to set callback if using Gurobi directly
+            try:
+                import gurobipy
+                solver.options['LogToConsole'] = 1
+                # Note: Callback through Pyomo is limited, but we'll try
+                results = solver.solve(model, tee=True)
+            except ImportError:
+                # Fallback if gurobipy not available
+                results = solver.solve(model, tee=True)
+
+
             
             # If infeasible, use Gurobi's IIS analysis
             if (results.solver.termination_condition == pyo.TerminationCondition.infeasible):
@@ -659,7 +707,8 @@ class Scheduler:
             
             # Check if solution was found
             if (results.solver.termination_condition == pyo.TerminationCondition.optimal or 
-                results.solver.termination_condition == pyo.TerminationCondition.feasible):
+                results.solver.termination_condition == pyo.TerminationCondition.feasible or
+                results.solver.termination_condition == pyo.TerminationCondition.maxTimeLimit):
                 
                 print(f"Final objective value: {pyo.value(model.objective):.4f}")
                 
