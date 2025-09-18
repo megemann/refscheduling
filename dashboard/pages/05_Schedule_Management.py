@@ -651,7 +651,7 @@ with workflow_tab3:
         completion_str = completion_datetime.strftime("%I:%M:%S %p")
         
         # Display optimization information
-        st.markdown("### 🚀 Optimization in Progress")
+        st.markdown("### Optimization in Progress")
         
         # Create centered container for spinner
         col1, col2, col3 = st.columns([1, 2, 1])
@@ -693,7 +693,7 @@ with workflow_tab3:
         if st.session_state.get('optimization_started', False) and not st.session_state.get('optimization_executed', False):
             st.session_state['optimization_executed'] = True
             
-            st.info("🚀 Running optimization algorithm...")
+            st.info("Running optimization algorithm...")
             
             try:
                 # Import scheduler

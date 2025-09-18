@@ -618,7 +618,7 @@ class Scheduler:
             solver.options['OutputFlag'] = 1
             solver.options['TimeLimit']  = 240
             solver.options['MIPGap']     = 0.05
-            solver.options['IISMethod'] = 1
+            
             
             # Add callback for progress tracking
             import json
