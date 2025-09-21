@@ -1,6 +1,6 @@
 # Intramural Referee Optimization Scheduling System
 
-![Banner](Assets\Banner.png)
+![Assets\Banner.png](https://github.com/megemann/refscheduling/blob/9085137305b7be9584f4207a59ec50bf2502d8ba/Assets/Banner.png)
 
 ## Overview
 
