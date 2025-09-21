@@ -1,10 +1,35 @@
-# Referee Scheduling System - README Outline
+# Intramural Referee Optimization Scheduling System
 
 ## Overview
-- At UMass, Intramurals is an ongoing activity, with many leagues constantly running throughout the year. In some activities, like basketball, RecWell must hire referees to officiate games to foster a more professional environment. My job as a Program Assistant is to recruit, train, develop, and schedule these refs throughout the season for all the games we have participants for. However, facilitating the scheduling and operations of 150+ teams on 4 different days is an extremely time-consuming process, usually involving cross-referencing general availability with week-specific conflicts in a manual Excel spreadsheet.
-- Goal is to create a scheduling dashboard that provides automated scheduling through optimization, customizable constraints based on week-to-week challenges, auto-generated Excel filing for scheduling, availability, check-ins, and payroll, simple visualizations of availabilty and game data to aid domain understanding, straight-forward directions to simplify the process for future employees, and foster other integrations.
-- Current challenges include time-intensive manual cross-referencing (4+ hours per week per sport), error-prone human scheduling mistakes, inflexible last-minute changes requiring extensive rework, payroll complexity, uneven workload distribution affecting referee satisfaction, and poor scalability with league growth.
-- Many PAs repeat scheduling from the previous weeks, which keeps the same refs together as well as if theres a problem one week it continues with minimal adjustments
+
+Intramurals at UMass run year-round, with multiple leagues going at once. For sports like basketball, RecWell hires referees to help create a more professional game environment. As a Program Assistant, part of my job is to recruit, train, develop, and (most importantly) schedule these referees across the season.
+
+**The problem**: scheduling for **150+ teams** over **four nights each week** is incredibly time-consuming. Right now, it mostly means cross-referencing general availability against week-specific conflicts in a giant Excel sheet. **It takes hours, it’s easy to make mistakes, and small changes often mean redoing big chunks of the schedule.**
+
+My goal is to build a scheduling system that cuts through that. The tool automatically generates referee schedules using optimization, supports week-to-week constraint tweaks, exports Excel files for schedules, availability, check-ins, and payroll, and includes simple visualizations of availability and game data to make everything easier to understand. The idea is to make the process faster, more accurate, and more sustainable for future Program Assistants.
+
+The challenges today are:
+
+1. Manual scheduling takes 4+ hours per sport per week
+2. Human error leads to conflicts and oversights
+3. Last-minute changes cause major rework
+4. Payroll tracking is messy
+5. Workload distribution isn’t always fair, which hurts morale
+6. Scaling up with more leagues or teams just makes all of this worse
+
+Because of that, many PAs just copy last week’s schedule forward. It’s quick, but it keeps the same refs stuck together and means any issues just roll over from week to week with little adjustment.
+
+### My Solution
+
+I built this tool around the real needs of my bosses, past student employees, and the Program Assistant manual. The idea was to make something that slots directly into the existing workflow without adding complexity.
+
+**I prioritized that following features:**
+- Excel in/out that matches the files we already use
+- Flexible framework to handle week-to-week quirks and exceptions
+- **Clear, adjustable objectives** so priorities can shift as needed
+- Reusable data so once information is entered, it carries forward
+- **Time savings: reduces weekly scheduling from hours to minutes**
+- Built-in checks to prevent conflicts and improve fairness across referees
 
 ## Features
 
@@ -20,13 +45,34 @@ This project integrates the **Pyomo** framework with **Gurobi** as a backend sol
 The objective function allows for a **custom normalized weighting** of objective values to allow for **flexible adjustments** based on customer goals. Additionally, it leverages real consumer feedback as well as direct job documentation when formulating hard and soft constraints for the objective value (i took advice from the PA manual regarding the goals of scheduling). It supports **scaling** to **70+** games with **40+** officials, still offering premium performance in high-throughput situations.
 
 ### Streamlit Dashboard
-- Streamlit dashboarding for data input/visualization
-- Template generation and file upload
-- Schedule export functionality
-- Manual assignment overrides
-- Referee and game management tools
 
-To aid in usage for non-technical student employees, this tool leverages a **streamlit dashboard** that provides visualization, statistics, and custom inputs that follow common practices in recreation. This includes **excel file export / import,** custom constraint assignment and objective weighting, as well as game / official management tools (more specific). This abstracts away solver complexity by mapping domain-level inputs (availability, shift requests) to model parameters. It was developed with in conjuction with real consumer feedback and requests. 
+To aid in usage for non-technical student employees, this tool leverages a **streamlit dashboard** that provides visualization, statistics, and custom inputs that follow common practices in recreation. This includes **excel file export / import,** custom constraint assignment and objective weighting, as well as game / official management tools. This abstracts away solver complexity by mapping domain-level inputs (availability, shift requests) to model parameters. It was developed with in conjuction with real consumer feedback and requests. 
+
+## Streamlit (Experimental Preview)
+
+A Streamlit dashboard is in active development to provide a visual interface for uploading data, running optimizations, and inspecting schedules. Revisions are incoming based on user feedback. 
+
+Currently, this feature is **experimental** and subject to significant changes.  
+If you’d like to preview it:
+
+```bash
+streamlit run dashboard/main.py
+```
+
+> Note: functionality is limited and may not reflect the final workflow.
+>Detailed documentation will be added once the dashboard stabilizes.
+**Demo Video**
+
+You can watch a demonstration of the dashboard in action:
+
+<video src="Assets/9-21-Demo.mp4" controls width="600">
+  Your browser does not support the video tag.
+</video>
+
+- [▶️ Demo Video (9/21)](Assets/9-21-Demo.mp4)
+
+_Note: If the link does not open in your browser, right-click and select "Open link in new tab" or download the file to view locally._
+
 
 ## Mathematical Formulation
 
@@ -132,49 +178,8 @@ The system implements a **3-layer architecture** optimized for performance and m
 
 *Full API specifications and implementation details available in [Appendix A: Detailed Technical Implementation](#appendix-a-detailed-technical-implementation)*
 
-## Installation & Setup
-- Streamlit: Dashboarding
-- Pyomo: Framework definition
-- Gurobi/GLPK: MILP solver
-- Pandas: Tabular data processing
-- xslxwriter: Excel Filings
-
-## Usage
-
-### Quick Start
-- Basic workflow steps
-- Example data preparation
-- Running optimization
-- Viewing results
-
-### Advanced Features
-- Manual assignment overrides
-- Parameter tuning
-- Constraint customization
-- Batch processing
-
-## Input/Output Formats
-
-### Input Data
-- Referee availability spreadsheet format
-- Game information requirements
-- Configuration parameters
-
-### Output Data
-- Optimized schedule format
-- Assignment summary reports
-- Constraint violation reports
-- Performance metrics
-
-## Performance & Scalability
-- Scale: 40+ referees per season, 70+ games per week during peak regular season, multiple skill levels (Top-Gun, Just Fun, Co-Rec), time slots [6:30 pm, 7:30 pm, 8:30 pm, 9:30 pm], 4 Courts available per hour
-- Problem size limitations
-- Solver performance benchmarks
-- Memory requirements
-- Optimization time estimates
 
 ## Future Enhancements
-
 
 The developments planned for the future are:
 1. **Reduce Time to Insight:**
@@ -184,15 +189,30 @@ The developments planned for the future are:
 3. **Additional Customizabilty:**
    - Many assumptions are currently be made based on difficulty, referee experience, and domain knowledge. More flexibility for this app would improve future flexibilty.
 
-## Contributing
-- Development setup
-- Code structure overview
-- Testing procedures
-- Pull request guidelines
-
 ## License
-- License information
-- Usage terms
+
+This project is licensed under the Prosperity Public License 3.0.0.
+
+### Summary
+
+The Prosperity Public License (PPL) 3.0.0 is a source-available license that allows you to use, copy, modify, and distribute the software for non-commercial purposes. Commercial use is only permitted after the specified "Change Date" (if any), or by purchasing a commercial license from the copyright holder.
+
+### Key Terms
+
+- **Non-Commercial Use:** You may use, copy, modify, and distribute this software, in whole or in part, for non-commercial purposes only.
+- **Commercial Use:** You may not use this software, in whole or in part, for commercial purposes, except after the Change Date or by purchasing a commercial license.
+- **Change Date:** If a Change Date is specified in the license file, the software becomes available for commercial use after that date.
+- **No Warranty:** The software is provided "as-is" without warranty of any kind.
+
+For the full license text, see [https://prosperitylicense.com/versions/3.0.0](https://prosperitylicense.com/versions/3.0.0).
+
+### Usage Terms
+
+- You may use, modify, and share this software for non-commercial purposes.
+- For commercial use, please contact the copyright holder for licensing.
+- You must include a copy of the Prosperity Public License 3.0.0 with any distribution of this software.
+
+If you have questions about what constitutes commercial use, please refer to the official license FAQ: [https://prosperitylicense.com/faq](https://prosperitylicense.com/faq).
 
 ---
 
