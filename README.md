@@ -120,10 +120,10 @@ Hard constraints guarantee feasibility (availability, hour limits, coverage). So
 | Constraint                                                                                                   | Meaning                                                                 |
 | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
 | $\sum_{g \in G} x_{i,j,k,g} \leq 1$                                                                         | A referee cannot be assigned to more than one game per hour             |
-| $\sum_{h \in H}\sum_{g \in G} x_{i,j,h,g} \leq H_{\text{max\_night}}$                                       | No referee can work more than $H_{\text{max\_night}}$ hours in a single night (user-defined) |
-| $\sum_{d \in D}\sum_{h \in H}\sum_{g \in G} x_{i,d,h,g} \leq H_{\text{max\_week}}$                          | No referee can be scheduled more than $H_{\text{max\_week}}$ hours per week (user-defined)   |
+| $\sum_{h \in H}\sum_{g \in G} x_{i,j,h,g} \leq H_{\text{max-night}}$                                       | No referee can work more than $H_{\text{max-night}}$ hours in a single night (user-defined) |
+| $\sum_{d \in D}\sum_{h \in H}\sum_{g \in G} x_{i,d,h,g} \leq H_{\text{max-week}}$                          | No referee can be scheduled more than $H_{\text{max-week}}$ hours per week (user-defined)   |
 | $x_{i,j,k,g} \leq a_{i,j,k}$                                                                                | Referees cannot be scheduled outside of their availability              |
-| $\text{MIN\_REF}_{g} \leq \sum_{i \in R} x_{i,j,k,g} \leq \text{MAX\_REF}_{g}$                              | Each game $g$ must have between its required minimum and maximum number of referees assigned |
+| $\text{MIN-REF}\_{g} \leq \sum_{i \in R} x_{i,j,k,g} \leq \text{MAX-REF}_{g}$                              | Each game $g$ must have between its required minimum and maximum number of referees assigned |
 | $x_{i,j,k,g} \leq G_{j,k,g}$                                                                                | Referees can only work games that are actually scheduled                |
 
 </div>
