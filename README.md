@@ -1,5 +1,7 @@
 # Intramural Referee Optimization Scheduling System
 
+![Banner](Assets\Banner.png)
+
 ## Overview
 
 Intramurals at UMass run year-round, with multiple leagues going at once. For sports like basketball, RecWell hires referees to help create a more professional game environment. As a Program Assistant, part of my job is to recruit, train, develop, and (most importantly) schedule these referees across the season.
@@ -81,30 +83,30 @@ _Note: If the link does not open in your browser, right-click and select "Open l
 
 | Symbol           | Type   | Meaning                                                                            |
 | ---------------- | ------ | ---------------------------------------------------------------------------------- |
-| $x_{i,j,k,l}$ | Binary | $1$ if referee $i$ works on day $j$, hour $k$, game $l$; $0$ otherwise |
-| $a_{i,j,k}$   | Binary | $1$ if referee $i$ is available on day $j$, hour $k$                       |
-| $G_{j,k,l}$   | Binary | $1$ if game $l$ is scheduled on day $j$, hour $k$                          |
+| $x_{i,j,k,l}$    | Binary | $1$ if referee $i$ works on day $j$, hour $k$, game $l$; $0$ otherwise            |
+| $a_{i,j,k}$      | Binary | $1$ if referee $i$ is available on day $j$, hour $k$                               |
+| $G_{j,k,l}$      | Binary | $1$ if game $l$ is scheduled on day $j$, hour $k$                                  |
 | (Auxiliary vars) | Binary | Model shift-block continuity and skill-pairing rules                               |
 
 </div>
 
-
 ### Objective Function
 <div align="center">
 
-| Term      | Meaning                                                                 | Weight   |
-| --------- | ----------------------------------------------------------------------- | -------- |
-| $e(x)$  | Effort bonus – awards higher-effort officials with more hours           | $w_1$ |
-| $b(x)$  | Hour balancing penalty – penalizes deviation from mean hours            | $w_2$ |
-| $s(x)$  | Skill penalty – penalizes low average skill compared to game difficulty | $w_3$ |
-| $tb(x)$ | Shift-block penalty – penalizes fragmented independent shifts           | $w_4$ |
-| $p(x)$  | Pairing bonus – rewards pairing experienced and inexperienced refs      | $w_5$ |
+| Term         | Meaning                                                                 | Weight   |
+| ------------ | ----------------------------------------------------------------------- | -------- |
+| $e(x)$       | Effort bonus – awards higher-effort officials with more hours           | $w_1$    |
+| $b(x)$       | Hour balancing penalty – penalizes deviation from mean hours            | $w_2$    |
+| $s(x)$       | Skill penalty – penalizes low average skill compared to game difficulty | $w_3$    |
+| $tb(x)$      | Shift-block penalty – penalizes fragmented independent shifts           | $w_4$    |
+| $p(x)$       | Pairing bonus – rewards pairing experienced and inexperienced refs       | $w_{5}$  |
 
 <div style="background-color: white; height: 0.5px; width:570px"></div>
 </div>
 
-
-$$max \quad{obj(x) = w_1*e(x) - w_2*b(x) - w_3*s(x) - w_4*tb(x) + w_5*p(x)}$$
+$$
+\max \quad obj(x) = w_1 e(x) - w_2 b(x) - w_3 s(x) - w_4 tb(x) + w_{5} p(x)
+$$
 - _Terms normalized by means for proper weighting_
 
 ### Constraints
@@ -115,18 +117,16 @@ Hard constraints guarantee feasibility (availability, hour limits, coverage). So
 
 <div align="center">
 
-| Constraint                                                                 | Meaning                                                            |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| $\sum_{g \in G} x_{i,j,k,g} \leq 1$                                    | A referee cannot be assigned to more than one game per hour        |
-| $\sum_{h \in H}\sum_{g \in G} x_{i,j,h,g} \leq H_{\text{max\_night}}$                     | No referee can work more than $H_{\text{max\_night}}$ hours in a single night (user-defined)            |
-| $\sum_{d \in D}\sum_{h \in H}\sum_{g \in G} x_{i,d,h,g} \leq H_{\text{max\_week}}$     | No referee can be scheduled more than $H_{\text{max\_week}}$ hours per week (user-defined)            |
-| $x_{i,j,k,g} \leq a_{i,j,k}$                                           | Referees cannot be scheduled outside of their availability         |
-| $\text{MIN\_REF}_{g} \leq \sum_{i \in R} x_{i,j,k,g} \leq \text{MAX\_REF}_{g}$ | Each game $g$ must have between its required minimum and maximum number of referees assigned |
-| $x_{i,j,k,g} \leq G_{j,k,g}$                                           | Referees can only work games that are actually scheduled           |
+| Constraint                                                                                                   | Meaning                                                                 |
+| ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| $\sum_{g \in G} x_{i,j,k,g} \leq 1$                                                                         | A referee cannot be assigned to more than one game per hour             |
+| $\sum_{h \in H}\sum_{g \in G} x_{i,j,h,g} \leq H_{\text{max\_night}}$                                       | No referee can work more than $H_{\text{max\_night}}$ hours in a single night (user-defined) |
+| $\sum_{d \in D}\sum_{h \in H}\sum_{g \in G} x_{i,d,h,g} \leq H_{\text{max\_week}}$                          | No referee can be scheduled more than $H_{\text{max\_week}}$ hours per week (user-defined)   |
+| $x_{i,j,k,g} \leq a_{i,j,k}$                                                                                | Referees cannot be scheduled outside of their availability              |
+| $\text{MIN\_REF}_{g} \leq \sum_{i \in R} x_{i,j,k,g} \leq \text{MAX\_REF}_{g}$                              | Each game $g$ must have between its required minimum and maximum number of referees assigned |
+| $x_{i,j,k,g} \leq G_{j,k,g}$                                                                                | Referees can only work games that are actually scheduled                |
 
 </div>
-
-### Optimization Parameters
 
 Solver parameters are tuned to balance solution quality with runtime efficiency:
 
