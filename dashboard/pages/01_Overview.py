@@ -100,7 +100,7 @@ if uploaded_master_file is not None:
             
             if st.button("Import Complete Dataset", width='stretch', type="primary", key="quick_import"):
                 # Import referees
-                from phase2.Ref import Ref
+                from phase3.Ref import Ref
                 new_referees = []
                 time_columns = [col for col in refs_df.columns 
                               if col not in ['Referee_Name', 'Email', 'Phone', 'Experience', 'Effort']]
@@ -130,17 +130,45 @@ if uploaded_master_file is not None:
                     new_referees.append(new_ref)
                 
                 # Import games
-                from phase2.Game import Game
+                from phase3.Game import Game
                 new_games = []
                 for _, row in games_df.iterrows():
+                    # Handle both old and new format
+                    if 'Location_Descriptor' in games_df.columns and 'Location_Number' in games_df.columns:
+                        location_descriptor = str(row['Location_Descriptor'])
+                        location_number = int(row['Location_Number'])
+                        location = f"{location_descriptor} {location_number}"
+                    elif 'Location' in games_df.columns:
+                        location = str(row['Location'])
+                        location_descriptor = None
+                        location_number = None
+                    else:
+                        location = "Court 1"
+                        location_descriptor = None
+                        location_number = None
+                    
+                    # Handle division fields
+                    division_type = None
+                    division_number = None
+                    if 'Division_Type' in games_df.columns:
+                        div_val = row.get('Division_Type', '')
+                        division_type = str(div_val) if div_val and str(div_val) != '' and str(div_val) != 'nan' else None
+                    if 'Division_Number' in games_df.columns:
+                        div_num_val = row.get('Division_Number', '')
+                        division_number = str(div_num_val) if div_num_val and str(div_num_val) != '' and str(div_num_val) != 'nan' else None
+                    
                     new_game = Game(
                         date=str(row['Date']),
                         time=str(row['Time']),
                         number=int(row['Game_Number']),
                         difficulty=str(row['Difficulty']),
-                        location=str(row['Location']),
+                        location=location,
                         min_refs=int(row['Min_Refs']),
-                        max_refs=int(row['Max_Refs'])
+                        max_refs=int(row['Max_Refs']),
+                        location_descriptor=location_descriptor,
+                        location_number=location_number,
+                        division_type=division_type,
+                        division_number=division_number
                     )
                     new_games.append(new_game)
                 
@@ -250,11 +278,11 @@ if optimization_complete and has_referees and has_games:
         if st.button("📈 View Full Schedule", type="primary"):
             st.switch_page("pages/05_Schedule_Management.py")
 
-# Master Excel Download - only show when both refs and games exist
+# Master Input Sheet Download - only show when both refs and games exist
 if has_availability_data and has_games and has_referees:
     st.markdown("---")
-    st.subheader("Export Complete Dataset")
-    st.markdown("Download your complete dataset for backup or sharing.")
+    st.subheader("Export Master Input Sheet")
+    st.markdown("Download your master input sheet with referees and games for backup or sharing.")
     
     import pandas as pd
     import io
@@ -299,8 +327,11 @@ if has_availability_data and has_games and has_referees:
                     'Game_Number': game.get_number(),
                     'Date': game.get_date(),
                     'Time': game.get_time(),
-                    'Location': game.get_location(),
+                    'Location_Descriptor': game.get_location_descriptor(),
+                    'Location_Number': game.get_location_number(),
                     'Difficulty': game.get_difficulty(),
+                    'Division_Type': game.get_division_type() or '',
+                    'Division_Number': game.get_division_number() or '',
                     'Min_Refs': game.get_min_refs(),
                     'Max_Refs': game.get_max_refs()
                 })
@@ -309,9 +340,9 @@ if has_availability_data and has_games and has_referees:
             game_df.to_excel(writer, sheet_name='Games', index=False)
     
     st.download_button(
-        label="Download Master Excel",
+        label="Download Master Input Sheet",
         data=output.getvalue(),
-        file_name="master_schedule_data.xlsx",
+        file_name="master_input_sheet.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         width='stretch',
         type="primary"

@@ -5,7 +5,7 @@ import os
 import time
 from datetime import datetime
 
-# Add the parent directory to the path to import from phase2
+# Add the parent directory to the path to import from phase3
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 # Set page config
@@ -700,7 +700,7 @@ with workflow_tab3:
                 import sys
                 import os
                 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-                from phase2.scheduler import Scheduler
+                from phase3.scheduler import Scheduler
                 
                 # Create scheduler instance
                 scheduler = Scheduler(st.session_state['referees'], st.session_state['games'])

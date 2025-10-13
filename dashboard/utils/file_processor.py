@@ -3,9 +3,12 @@ import streamlit as st
 import os
 import sys
 
-# Add path to access phase2 classes
+# Add path to access phase3 classes
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-from phase2.Ref import Ref
+from phase3.Ref import Ref
+from phase3.Game import Game
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill
 
 def process_uploaded_file(uploaded_file):
     """Process the uploaded availability file"""
@@ -184,3 +187,166 @@ def clear_availability_data():
         os.remove('DATA/Convert.csv')
         return True
     return False
+
+def process_master_schedule(uploaded_file):
+    """Process the uploaded master schedule file and extract games"""
+    try:
+        # Save uploaded file temporarily
+        temp_path = 'DATA/temp_master_schedule.xlsx'
+        with open(temp_path, 'wb') as f:
+            f.write(uploaded_file.getbuffer())
+        
+        # Load workbook with openpyxl to read colors
+        wb = load_workbook(temp_path)
+        ws = wb.active
+        
+        games = []
+        game_number = 1
+        
+        # Parse the schedule structure
+        # Find where the actual schedule starts (after title rows)
+        schedule_start_row = None
+        for row_idx in range(1, 20):  # Check first 20 rows
+            cell_value = ws.cell(row=row_idx, column=1).value
+            if cell_value == 'Day':
+                schedule_start_row = row_idx
+                break
+        
+        if not schedule_start_row:
+            raise ValueError("Could not find schedule start (Day header)")
+        
+        # Read location headers
+        locations = []
+        col_idx = 3  # Start from column C (after Day and Time)
+        while True:
+            header_cell = ws.cell(row=schedule_start_row, column=col_idx)
+            if header_cell.value:
+                # Location header spans 2 columns (division type + number)
+                locations.append(header_cell.value)
+                col_idx += 2  # Skip to next location (2 columns per location)
+            else:
+                break
+        
+        if not locations:
+            raise ValueError("Could not find any location headers")
+        
+        # Parse each day section
+        current_row = schedule_start_row + 1
+        while current_row < ws.max_row:
+            # Check if this is a day row (merged cells in columns A-B)
+            day_cell = ws.cell(row=current_row, column=1)
+            day_name = day_cell.value
+            
+            if not day_name or day_name == '':
+                current_row += 1
+                continue
+            
+            # Get the date for this day (merged across location columns)
+            date_cell = ws.cell(row=current_row, column=3)
+            day_date = date_cell.value if date_cell.value else ''
+            
+            current_row += 1
+            
+            # Process time slots until we hit a black separator or end
+            while current_row < ws.max_row:
+                time_cell = ws.cell(row=current_row, column=1)
+                time_value = time_cell.value
+                
+                # Check if we hit a separator (black row) or next day
+                if not time_value or time_value == '':
+                    break
+                
+                # Check if it's a valid time (not a day name)
+                if str(time_value) in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Day']:
+                    break
+                
+                # Process each location for this time slot
+                for loc_idx, location in enumerate(locations):
+                    # Calculate column indices (2 columns per location)
+                    div_type_col = 3 + (loc_idx * 2)
+                    div_num_col = 3 + (loc_idx * 2) + 1
+                    
+                    # Get cell values
+                    div_type_cell = ws.cell(row=current_row, column=div_type_col)
+                    div_num_cell = ws.cell(row=current_row, column=div_num_col)
+                    
+                    division_type = div_type_cell.value
+                    division_number = div_num_cell.value
+                    
+                    # Check cell color to determine if game is scheduled
+                    fill = div_type_cell.fill
+                    is_scheduled = False
+                    
+                    if fill and fill.start_color:
+                        # Get color as string
+                        if hasattr(fill.start_color, 'rgb'):
+                            color_str = str(fill.start_color.rgb) if fill.start_color.rgb else ''
+                        elif hasattr(fill.start_color, 'index'):
+                            color_str = str(fill.start_color.index)
+                        else:
+                            color_str = str(fill.start_color)
+                        
+                        # Green, Yellow, or Red means scheduled
+                        # Check if it's NOT grey (C0C0C0) or white - if it has color, it's scheduled
+                        if color_str and color_str not in ['', '00000000', 'FFC0C0C0', 'C0C0C0', 'FFFFFFFF', 'FFFFFF']:
+                            # Check for green, yellow, or red
+                            if any(c in color_str.upper() for c in ['FF92D050', '92D050', 'FFFFFF00', 'FFFF00', '00FF00', '90EE90', 'FFFF0000', 'FF0000', 'FF9999']):
+                                is_scheduled = True
+                    
+                    # Only create game if it has BOTH division type AND division number and is scheduled
+                    if division_type and division_type != '' and division_number and division_number != '' and is_scheduled:
+                        # Parse location (e.g., "Court 1")
+                        location_parts = location.split()
+                        location_descriptor = location_parts[0] if len(location_parts) > 0 else "Court"
+                        location_number = int(location_parts[1]) if len(location_parts) > 1 else 1
+                        
+                        # Parse time - strip PM/AM labels for scheduler compatibility
+                        time_str = str(time_value).strip()
+                        # Remove "pm", "PM", "am", "AM" if present
+                        time_str = time_str.replace(' pm', '').replace(' PM', '').replace('pm', '').replace('PM', '')
+                        time_str = time_str.replace(' am', '').replace(' AM', '').replace('am', '').replace('AM', '')
+                        time_str = time_str.strip()
+                        
+                        # Map division type to difficulty
+                        difficulty_map = {
+                            'CRJF': 'Co-Rec - Just Fun',
+                            'OJF': 'Open - Just Fun',
+                            'OTG': 'Open - Top Gun',
+                            'CRTG': 'Co-Rec - Top Gun',
+                            'W': 'Womens'
+                        }
+                        difficulty = difficulty_map.get(str(division_type), str(division_type))
+                        
+                        # Create game object
+                        new_game = Game(
+                            date=day_name,  # Use day of week, not actual date
+                            time=time_str,  # Time without PM/AM label
+                            number=game_number,
+                            difficulty=difficulty,  # Mapped from division type
+                            location=location,
+                            min_refs=2,  # Default values
+                            max_refs=3,
+                            location_descriptor=location_descriptor,
+                            location_number=location_number,
+                            division_type=str(division_type) if division_type else None,
+                            division_number=str(division_number) if division_number else None
+                        )
+                        
+                        games.append(new_game)
+                        game_number += 1
+                
+                current_row += 1
+        
+        # Clean up temp file
+        try:
+            os.remove(temp_path)
+        except:
+            pass
+        
+        return games, True
+        
+    except Exception as e:
+        st.error(f"Error processing master schedule: {str(e)}")
+        import traceback
+        st.code(traceback.format_exc())
+        return [], False
