@@ -223,7 +223,7 @@ with workflow_tab1:
             
             if day not in day_time_games:
                 day_time_games[day] = {}
-            if time not in day_time_games[day]:
+            if time_slot not in day_time_games[day]:
                 day_time_games[day][time_slot] = []
             
             day_time_games[day][time_slot].append(game)
@@ -331,8 +331,13 @@ with workflow_tab1:
                     # Create selection for each day at this time
                     for day_idx, day in enumerate(sorted_days):
                         with time_cols[day_idx + 1]:
-                            if day in day_time_games and time_slot in day_time_games[day]:
-                                games_at_time = day_time_games[day][time_slot]
+                            # Search through ALL games to find matches for this day and time
+                            games_at_time = []
+                            for game in st.session_state['games']:
+                                if game.get_date() == day and game.get_time() == time_slot:
+                                    games_at_time.append(game)
+                            
+                            if games_at_time:
                                 
                                 # Check if ref is available at this time
                                 time_columns = st.session_state.get('time_columns', [])
@@ -347,22 +352,29 @@ with workflow_tab1:
                                         break
                                 
                                 if is_available:
-                                    # Create game options for dropdown with location and difficulty
+                                    # Create game options for dropdown showing ALL games at this time
                                     game_options = ["None"]
-                                    for game in games_at_time:
-                                        location = game.get_location() if hasattr(game, 'get_location') else "Unknown"
-                                        difficulty = game.get_difficulty() if hasattr(game, 'get_difficulty') else "Unknown"
-                                        game_option = f"G:{game.get_number()} - L:{location} - D:{difficulty}"
-                                        game_options.append(game_option)
+                                    game_number_map = {}  # Map display string to game number
                                     
-                                    # Find current selection
+                                    for game in games_at_time:
+                                        # Get division info
+                                        div_type = game.get_division_type() if hasattr(game, 'get_division_type') else ""
+                                        div_num = game.get_division_number() if hasattr(game, 'get_division_number') else ""
+                                        division = f"{div_type}-{div_num}" if div_type and div_num else (div_type or div_num or "Unknown")
+                                        
+                                        game_option = f"G:{game.get_number()} D:{division}"
+                                        game_options.append(game_option)
+                                        game_number_map[game_option] = game.get_number()
+                                    
+                                    # Find current selection (if referee is assigned to any game at this time)
                                     current_selection = "None"
                                     assigned_games = ref.get_assigned_games()
                                     for game in games_at_time:
                                         if game.get_number() in assigned_games:
-                                            location = game.get_location() if hasattr(game, 'get_location') else "Unknown"
-                                            difficulty = game.get_difficulty() if hasattr(game, 'get_difficulty') else "Unknown"
-                                            current_selection = f"G:{game.get_number()} - L:{location} - D:{difficulty}"
+                                            div_type = game.get_division_type() if hasattr(game, 'get_division_type') else ""
+                                            div_num = game.get_division_number() if hasattr(game, 'get_division_number') else ""
+                                            division = f"{div_type}-{div_num}" if div_type and div_num else (div_type or div_num or "Unknown")
+                                            current_selection = f"G:{game.get_number()} D:{division}"
                                             break
                                     
                                     try:
@@ -380,23 +392,23 @@ with workflow_tab1:
                                     
                                     # Update ref assignments based on selection and track changes
                                     current_assigned_games = ref.get_assigned_games()
-                                    if selected != "None":
-                                        # Extract game number from format "G:{number} - L:{location} - D:{difficulty}"
-                                        game_num = int(selected.split("G:")[1].split(" - ")[0])
-                                        if game_num not in current_assigned_games:
-                                            ref.add_assigned_game(game_num)
+                                    
+                                    # Remove any games at this time slot from assignments
+                                    for game in games_at_time:
+                                        if game.get_number() in current_assigned_games:
+                                            ref.remove_assigned_game(game.get_number())
                                             st.session_state['unsaved_schedule_changes'] = True
-                                    else:
-                                        # Remove any games at this time from assignments
-                                        for game in games_at_time:
-                                            if game.get_number() in current_assigned_games:
-                                                ref.remove_assigned_game(game.get_number())
-                                                st.session_state['unsaved_schedule_changes'] = True
+                                    
+                                    # Add the newly selected game
+                                    if selected != "None" and selected in game_number_map:
+                                        game_num = game_number_map[selected]
+                                        ref.add_assigned_game(game_num)
+                                        st.session_state['unsaved_schedule_changes'] = True
                                 else:
                                     # Show time slot but indicate not available
                                     st.markdown("*(N/A)*")
                             else:
-                                # Show time slot but indicate no games
+                                # No games at this time slot
                                 st.markdown("*(No games)*")
                     
                     # Empty column for hour limit area

@@ -5,13 +5,15 @@ import streamlit as st
 from pathlib import Path
 from datetime import datetime, timedelta
 
-def create_master_template(days_schedule=None, locations=None):
+def create_master_template(days_schedule=None, locations=None, min_refs=2, max_refs=3):
     """
     Create master schedule template
     
     Args:
         days_schedule: List of dicts with keys: 'day', 'date', 'times' (list of time strings)
         locations: List of dicts with keys: 'descriptor' (e.g., 'Court'), 'number' (e.g., 1)
+        min_refs: Minimum referees per game (default 2)
+        max_refs: Maximum referees per game (default 3)
     
     Returns:
         BytesIO object containing the Excel file
@@ -149,7 +151,8 @@ def create_master_template(days_schedule=None, locations=None):
     location_columns = num_locations * 2
     # Add extra columns for legend on the right
     legend_columns = 3  # Space for legend
-    num_cols_for_header = 2 + location_columns + legend_columns
+    padding_columns = 2  # Padding between schedule and legend
+    num_cols_for_header = 2 + location_columns + padding_columns + legend_columns
     
     # Get column letter for merging
     end_col_letter = chr(ord('A') + num_cols_for_header - 1)
@@ -169,10 +172,15 @@ def create_master_template(days_schedule=None, locations=None):
         worksheet.set_column(div_type_col, div_type_col, 10)  # Division type column
         worksheet.set_column(div_num_col, div_num_col, 5)     # Division number column
     
-    # Set width for legend columns on the right
-    legend_start_col = 2 + location_columns
+    # Set width for padding columns (empty space between schedule and legend)
+    padding_start_col = 2 + location_columns
+    for i in range(padding_columns):
+        worksheet.set_column(padding_start_col + i, padding_start_col + i, 3)  # Small padding columns
+    
+    # Set width for legend columns on the right (wider for readability)
+    legend_start_col = 2 + location_columns + padding_columns
     for i in range(legend_columns):
-        worksheet.set_column(legend_start_col + i, legend_start_col + i, 15)
+        worksheet.set_column(legend_start_col + i, legend_start_col + i, 25)
     
     # Default schedule if none provided
     if days_schedule is None:
@@ -216,7 +224,7 @@ def create_master_template(days_schedule=None, locations=None):
         'valign': 'vcenter'
     })
     
-    legend_col = 2 + num_locations  # First column after location columns
+    legend_col = 2 + location_columns + 2  # First column after location columns + 2 padding columns
     legend_row = 2  # Start at row 3 (0-indexed)
     
     # Color Legend
@@ -258,11 +266,90 @@ def create_master_template(days_schedule=None, locations=None):
     worksheet.write(legend_row, legend_col + 1, 'Womens', legend_format)
     
     legend_row += 2
-    worksheet.write(legend_row, legend_col, 'Usage:', legend_bold)
+    worksheet.write(legend_row, legend_col, 'Instructions:', legend_bold)
     legend_row += 1
-    worksheet.write(legend_row, legend_col, '1. Select division', legend_format)
+    worksheet.write(legend_row, legend_col, '1. Edit metadata below', legend_format)
     legend_row += 1
-    worksheet.write(legend_row, legend_col, '2. Type number', legend_format)
+    worksheet.write(legend_row, legend_col, '2. Select division type', legend_format)
+    legend_row += 1
+    worksheet.write(legend_row, legend_col, '3. Type division number', legend_format)
+    legend_row += 1
+    worksheet.write(legend_row, legend_col, '4. Color cell green/yellow', legend_format)
+    legend_row += 1
+    worksheet.write(legend_row, legend_col, '5. Grey = no game', legend_format)
+    
+    # EDITABLE METADATA SECTION
+    legend_row += 2
+    
+    # Section header
+    editable_header_format = workbook.add_format({
+        'font_name': 'Times New Roman',
+        'bold': True,
+        'font_size': 11,
+        'align': 'left',
+        'valign': 'vcenter',
+        'border': 1,
+        'bg_color': 'white',
+        'font_color': 'black'
+    })
+    
+    worksheet.merge_range(legend_row, legend_col, legend_row, legend_col + 1, 
+                         '📋 EDITABLE METADATA & INSTRUCTIONS', editable_header_format)
+    legend_row += 1
+    
+    # Create editable input format
+    input_format = workbook.add_format({
+        'font_name': 'Times New Roman',
+        'font_size': 10,
+        'border': 1,
+        'bg_color': 'white',
+        'align': 'center',
+        'valign': 'vcenter'
+    })
+    
+    # Min Refs per Game
+    worksheet.write(legend_row, legend_col, 'Min Refs per Game:', legend_format)
+    worksheet.write(legend_row, legend_col + 1, min_refs, input_format)
+    legend_row += 1
+    
+    # Max Refs per Game
+    worksheet.write(legend_row, legend_col, 'Max Refs per Game:', legend_format)
+    worksheet.write(legend_row, legend_col + 1, max_refs, input_format)
+    legend_row += 1
+    
+    # Additional Instructions
+    editable_text_format = workbook.add_format({
+        'font_name': 'Times New Roman',
+        'font_size': 10,
+        'border': 1,
+        'bg_color': 'white',
+        'align': 'left',
+        'valign': 'top',
+        'text_wrap': True
+    })
+    
+    worksheet.write(legend_row, legend_col, 'Instructions:', legend_format)
+    legend_row += 1
+    # Set row heights BEFORE merging
+    worksheet.set_row(legend_row, 25)
+    worksheet.set_row(legend_row + 1, 25)
+    worksheet.set_row(legend_row + 2, 25)
+    worksheet.merge_range(legend_row, legend_col, legend_row + 2, legend_col + 1, 
+                         'Add any special instructions or notes here...\n\n(You can edit this text)', 
+                         editable_text_format)
+    legend_row += 3
+    
+    # Notes
+    worksheet.write(legend_row, legend_col, 'Notes:', legend_format)
+    legend_row += 1
+    # Set row heights BEFORE merging
+    worksheet.set_row(legend_row, 25)
+    worksheet.set_row(legend_row + 1, 25)
+    worksheet.set_row(legend_row + 2, 25)
+    worksheet.merge_range(legend_row, legend_col, legend_row + 2, legend_col + 1, 
+                         'Add any additional notes here...\n\n(You can edit this text)', 
+                         editable_text_format)
+    legend_row += 3
     
     for day_idx, day_info in enumerate(days_schedule):
         day_name = day_info['day']
@@ -333,9 +420,9 @@ def create_master_template(days_schedule=None, locations=None):
     
     return output.getvalue()
 
-def save_template_to_root(days_schedule=None, locations=None):
+def save_template_to_root(days_schedule=None, locations=None, min_refs=2, max_refs=3):
     """Save master template to DATA directory"""
-    data = create_master_template(days_schedule, locations)
+    data = create_master_template(days_schedule, locations, min_refs, max_refs)
     root_dir = Path(__file__).resolve().parents[2]
     data_dir = root_dir / 'DATA'
     data_dir.mkdir(parents=True, exist_ok=True)

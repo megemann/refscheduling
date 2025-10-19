@@ -102,158 +102,8 @@ else:
     # Initialize unsaved changes tracking
     if 'unsaved_game_changes' not in st.session_state:
         st.session_state['unsaved_game_changes'] = False
-
-    # Game Management Section
-    st.markdown("---")
-    st.subheader("Game Management")
     
-    # Create subtabs for different game creation methods
-    tab1, tab2, tab3 = st.tabs(["Bulk Creation", "Master Schedule", "Fusion Parser"])
-    
-    with tab1:
-        st.markdown("#### Bulk Game Creation")
-        st.write("Create multiple games quickly using the existing time slot interface, then customize details individually.")
-        
-        # Default settings for bulk creation
-        col1, col2 = st.columns(2)
-        with col1:
-            default_min_refs = st.number_input(
-                "Default Min Refs",
-                min_value=1,
-                max_value=5,
-                value=2,
-                help="Default minimum referees for all games"
-            )
-        with col2:
-            default_max_refs = st.number_input(
-                "Default Max Refs", 
-                min_value=1,
-                max_value=5,
-                value=3,
-                help="Default maximum referees for all games"
-            )
-        
-        if default_max_refs < default_min_refs:
-            st.warning("Max refs must be >= Min refs")
-        
-        # Move the existing bulk creation logic here
-        st.write("Enter the number of games needed for each time slot:")
-        
-        # Create time slot summary for games input
-        time_slot_data = []
-        for col in availability_df.columns:
-            if '_' in col:
-                try:
-                    day, time_str = col.split('_', 1)
-                    count = availability_df[col].sum()
-                    time_slot_data.append({
-                        'Day': day,
-                        'Time': time_str,
-                        'Available_Refs': int(count),
-                        'Column': col
-                    })
-                except Exception as e:
-                    continue
-
-        if time_slot_data and default_max_refs >= default_min_refs:
-            # Sort by day order then by time
-            day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-            time_slot_df = pd.DataFrame(time_slot_data)
-            time_slot_df['day_sort'] = time_slot_df['Day'].apply(lambda x: day_order.index(x) if x in day_order else 999)
-            
-            # Parse time strings for proper sorting (earliest time first)
-            def parse_time_for_sort(time_str):
-                """Convert time string to comparable format for sorting"""
-                try:
-                    from datetime import datetime
-                    # Parse time string like "6:30 PM" or "10:30 AM"
-                    time_obj = datetime.strptime(time_str, "%I:%M %p")
-                    return time_obj.time()
-                except:
-                    # If parsing fails, return a default time for sorting
-                    return datetime.strptime("12:00 PM", "%I:%M %p").time()
-            
-            time_slot_df['time_sort'] = time_slot_df['Time'].apply(parse_time_for_sort)
-            time_slot_df = time_slot_df.sort_values(['day_sort', 'time_sort']).drop(['day_sort', 'time_sort'], axis=1)
-        
-            # Create input fields for each time slot
-            games_data = []
-            prev_day = None
-            for idx, row in time_slot_df.iterrows():
-                # Insert a border when the day changes (but not before the first day)
-                if prev_day is not None and row['Day'] != prev_day:
-                    st.markdown('<hr style="border-top: 2px solid #bbb; margin: 0.5em 0;">', unsafe_allow_html=True)
-                col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
-                with col1:
-                    st.write(f"**{row['Day']}**")
-                with col2:
-                    st.write(f"{row['Time']}")
-                with col3:
-                    st.write(f"{row['Available_Refs']} refs available")
-                with col4:
-                    num_games = st.number_input(
-                        "Games",
-                        min_value=0,
-                        max_value=10,
-                        value=0,
-                        key=f"bulk_games_{row['Column']}",
-                        label_visibility="collapsed"
-                    )
-                    games_data.append({
-                        'Day': row['Day'],
-                        'Time': row['Time'],
-                        'Available_Refs': row['Available_Refs'],
-                        'Games_Needed': num_games,
-                        'Column': row['Column']
-                    })
-                prev_day = row['Day']
-        
-            # Create games button
-            if st.button("Create Bulk Games", width='stretch', type="primary"):
-                games_to_create = [g for g in games_data if g['Games_Needed'] > 0]
-                if games_to_create:
-                    games_created = 0
-                    next_game_number = len(st.session_state['games']) + 1
-                    
-                    # Sort games_to_create by day and time to ensure earliest time first
-                    def parse_time_for_creation(time_str):
-                        """Convert time string to comparable format for creation order"""
-                        try:
-                            from datetime import datetime
-                            time_obj = datetime.strptime(time_str, "%I:%M %p")
-                            return time_obj.time()
-                        except:
-                            return datetime.strptime("12:00 PM", "%I:%M %p").time()
-                    
-                    day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-                    games_to_create_sorted = sorted(games_to_create, key=lambda x: (
-                        day_order.index(x['Day']) if x['Day'] in day_order else 999,
-                        parse_time_for_creation(x['Time'])
-                    ))
-                    
-                    for game_slot in games_to_create_sorted:
-                        for game_num in range(game_slot['Games_Needed']):
-                            new_game = Game(
-                                date=game_slot['Day'],  # Will need to be updated individually
-                                time=game_slot['Time'],
-                                number=next_game_number,
-                                difficulty="TBD",  # To be determined individually
-                                location="TBD",  # To be determined individually
-                                min_refs=default_min_refs,
-                                max_refs=default_max_refs
-                            )
-                            st.session_state['games'].append(new_game)
-                            next_game_number += 1
-                            games_created += 1
-                    
-                    st.session_state['unsaved_game_changes'] = True
-                    st.success(f"Created {games_created} games! Scroll down to customize individual game details. Use 'Save All Changes' to persist.")
-                    st.rerun()
-                else:
-                    st.warning("Please set at least one game for a time slot.")
-    
-    with tab2:
-        st.markdown("#### Master Schedule Import/Export")
+    with st.expander("📋 Master Schedule Import/Export", expanded=True):
         st.write("Configure, download, fill out, and upload your master schedule template.")
         
         try:
@@ -305,6 +155,31 @@ else:
                     format_func=lambda x: time_display_map.get(x, x),
                     key="master_time_select"
                 )
+                
+                # Metadata section
+                st.markdown("**Other Metadata**")
+                col1, col2 = st.columns(2)
+                with col1:
+                    master_min_refs = st.number_input(
+                        "Min Refs",
+                        min_value=1,
+                        max_value=5,
+                        value=2,
+                        help="Minimum referees for all games",
+                        key="master_min_refs"
+                    )
+                with col2:
+                    master_max_refs = st.number_input(
+                        "Max Refs",
+                        min_value=1,
+                        max_value=5,
+                        value=3,
+                        help="Maximum referees for all games",
+                        key="master_max_refs"
+                    )
+                
+                if master_max_refs < master_min_refs:
+                    st.warning("⚠️ Max refs must be >= Min refs")
                 
                 # Location configuration
                 st.markdown("**Configure Locations**")
@@ -360,7 +235,9 @@ else:
                         
                         template_data = create_master_template(
                             days_schedule=days_schedule,
-                            locations=locations
+                            locations=locations,
+                            min_refs=master_min_refs,
+                            max_refs=master_max_refs
                         )
                         
                         st.download_button(
@@ -371,7 +248,7 @@ else:
                             key="download_master_template_final"
                         )
                         st.success(f"✅ Template ready with {len(selected_days)} days, {len(selected_times)} times, {num_locations} locations!")
-            
+        
             with col_upload:
                 st.markdown("##### 📤 Upload Filled Schedule")
                 st.write("Upload your completed master schedule to import games.")
@@ -388,8 +265,12 @@ else:
                     try:
                         from dashboard.utils.file_processor import process_master_schedule
                         
+                        # Get min_refs and max_refs from session state (from download section)
+                        min_refs = st.session_state.get('master_min_refs', 2)
+                        max_refs = st.session_state.get('master_max_refs', 3)
+                        
                         # Process the master schedule
-                        imported_games, success = process_master_schedule(uploaded_master)
+                        imported_games, success = process_master_schedule(uploaded_master, min_refs=min_refs, max_refs=max_refs)
                         
                         if success and imported_games:
                             st.success(f"✅ Found {len(imported_games)} games in the master schedule!")
@@ -442,28 +323,6 @@ else:
             st.error(f"Error with master schedule: {e}")
             import traceback
             st.code(traceback.format_exc())
-    
-    with tab3:
-        st.markdown("#### Fusion Text Parser")
-        st.write("🚧 **Work in Progress** - Parse game data from Fusion website text")
-        
-        st.info("This feature will allow you to paste text from the Fusion website and automatically create games.")
-        
-        # Text input for fusion data
-        fusion_text = st.text_area(
-            "Paste Fusion text here:",
-            placeholder="""O-TG 01
-Sundays 9:30 pm @ Boyden Ct 4
-Sundays 9:30 pm @ Boyden Ct 5
-1 free agent
-5/5 teams""",
-            height=200,
-            help="Paste the text block from Fusion website"
-        )
-        
-        if fusion_text and st.button("Parse Fusion Text", width='stretch'):
-            st.warning("🚧 Parser not yet implemented. This will be available in a future update.")
-            st.code(fusion_text, language="text")
     
     # Show Add Game Form (outside tabs)
     if st.session_state.get('show_add_game_form', False):

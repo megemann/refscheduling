@@ -188,8 +188,17 @@ def clear_availability_data():
         return True
     return False
 
-def process_master_schedule(uploaded_file):
-    """Process the uploaded master schedule file and extract games"""
+def process_master_schedule(uploaded_file, min_refs=2, max_refs=3):
+    """Process the uploaded master schedule file and extract games
+    
+    Args:
+        uploaded_file: The uploaded Excel file
+        min_refs: Minimum referees per game (default 2, overridden by Excel value if present)
+        max_refs: Maximum referees per game (default 3, overridden by Excel value if present)
+    
+    Note: If the Excel file contains "Min Refs per Game" and "Max Refs per Game" fields
+    in the metadata section, those values will be used instead of the parameters.
+    """
     try:
         # Save uploaded file temporarily
         temp_path = 'DATA/temp_master_schedule.xlsx'
@@ -202,6 +211,28 @@ def process_master_schedule(uploaded_file):
         
         games = []
         game_number = 1
+        
+        # Read min_refs and max_refs from the Excel file metadata section
+        # Search for these values in the first 30 rows
+        for row_idx in range(1, 30):
+            for col_idx in range(1, 20):
+                cell_value = ws.cell(row=row_idx, column=col_idx).value
+                if cell_value and 'Min Refs per Game' in str(cell_value):
+                    # Value is in the next column
+                    min_refs_value = ws.cell(row=row_idx, column=col_idx + 1).value
+                    if min_refs_value is not None:
+                        try:
+                            min_refs = int(float(min_refs_value))
+                        except (ValueError, TypeError):
+                            pass
+                elif cell_value and 'Max Refs per Game' in str(cell_value):
+                    # Value is in the next column
+                    max_refs_value = ws.cell(row=row_idx, column=col_idx + 1).value
+                    if max_refs_value is not None:
+                        try:
+                            max_refs = int(float(max_refs_value))
+                        except (ValueError, TypeError):
+                            pass
         
         # Parse the schedule structure
         # Find where the actual schedule starts (after title rows)
@@ -324,8 +355,8 @@ def process_master_schedule(uploaded_file):
                             number=game_number,
                             difficulty=difficulty,  # Mapped from division type
                             location=location,
-                            min_refs=2,  # Default values
-                            max_refs=3,
+                            min_refs=min_refs,  # From parameters
+                            max_refs=max_refs,  # From parameters
                             location_descriptor=location_descriptor,
                             location_number=location_number,
                             division_type=str(division_type) if division_type else None,
