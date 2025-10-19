@@ -13,12 +13,11 @@ from dashboard.utils.file_processor import process_uploaded_file, load_availabil
 # Set page config
 st.set_page_config(
     page_title="Availability Setup",
-    page_icon="📋",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Add CSS for wider container
+# Add CSS for wider container and step boxes
 st.markdown("""
 <style>
 .main > div {
@@ -27,12 +26,23 @@ st.markdown("""
 .block-container {
     max-width: 95% !important;
 }
-</style>
-""", unsafe_allow_html=True)
 
-# Add table styling CSS for better readability
-st.markdown("""
-<style>
+/* Step box styling */
+.step-box {
+    padding: 25px;
+    border-radius: 10px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    margin: 20px 0;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.step-header {
+    font-size: 1.3em;
+    font-weight: 600;
+    margin-bottom: 15px;
+    color: #4CAF50;
+}
+
 /* Table styling for better readability */
 .stDataFrame, .stTable {
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
@@ -65,115 +75,132 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("Availability Setup")
-st.markdown("Follow these steps to set up referee availability:")
+st.markdown("Set up referee availability by downloading a template, filling it out, and uploading it back.")
 
-# Main content
-col1, col2 = st.columns(2)
+# Check if data already exists
+data_exists = os.path.exists('DATA/Convert.csv')
 
-with col1:
-    st.subheader("1. Download Template")
+# ==================== STEP 1: Download Template ====================
+
+st.markdown('<div class="step-header">Step 1: Download Template</div>', unsafe_allow_html=True)
+st.markdown("Customize and download an Excel template for your referees to fill out.")
 
 # Template customization section
-with st.expander("Customize Template", expanded=True):
-    st.write("**Select days and times for your template:**")
-    
-    # Day selection
+col_config1, col_config2 = st.columns(2)
+
+with col_config1:
+    st.markdown("**Days of the Week:**")
     all_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     selected_days = st.multiselect(
-        "Select Days:",
+        "Select Days",
         all_days,
-        default=['Monday', 'Tuesday', 'Wednesday', 'Thursday']
+        default=['Monday', 'Tuesday', 'Wednesday', 'Thursday'],
+        label_visibility="collapsed"
     )
     
-    # Number of referees
-    num_refs = st.number_input("Number of Referee Rows:", min_value=10, max_value=100, value=50)
-    
-    # Time selection with all available times
+    st.markdown("**Number of Referee Rows:**")
+    num_refs = st.number_input(
+        "Number of rows",
+        min_value=10,
+        max_value=100,
+        value=50,
+        label_visibility="collapsed"
+    )
+
+with col_config2:
+    st.markdown("**Time Slots:**")
     all_times = []
     for hour in range(3, 24):  # 3 AM to 11 PM
         for minute in [0, 30]:
             time_str = f"{hour}:{minute:02d}" if hour < 24 else f"{hour-24}:{minute:02d}"
             all_times.append(time_str)
     
-    # Multi-select for times
     selected_times = st.multiselect(
-        "Select Times:",
+        "Select Times",
         all_times,
-        default=['6:30', '7:30', '8:30', '9:30']
+        default=['6:30', '7:30', '8:30', '9:30'],
+        label_visibility="collapsed"
     )
-    
-    # Show configuration summary
-    if selected_days and selected_times:
-        total_slots = len(selected_days) * len(selected_times)
-        st.info(f"Configuration: {len(selected_days)} days × {len(selected_times)} times = {total_slots} total time slots")
 
-# Custom template download
-if 'selected_days' in locals() and 'selected_times' in locals() and selected_days and selected_times:
-    st.write("**Custom Template:**")
+# Show configuration summary and download button
+if selected_days and selected_times:
+    total_slots = len(selected_days) * len(selected_times)
     
-    # Generate custom Excel template
     try:
         custom_excel_data = create_custom_template(selected_days, selected_times, num_refs)
-        
         st.download_button(
-            label=f"📈 Download Custom Excel Template ({len(selected_days)} days × {len(selected_times)} times)",
+            label=f"Download Template ({len(selected_days)} days, {len(selected_times)} times, {num_refs} refs)",
             data=custom_excel_data,
-            file_name=f"custom_referee_template_{len(selected_days)}days_{len(selected_times)}times.xlsx",
+            file_name=f"referee_availability_template.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            width='stretch'
+            use_container_width=True,
+            type="primary"
         )
     except Exception as e:
-        st.error(f"Error generating custom template: {str(e)}")
+        st.error(f"Error generating template: {str(e)}")
 else:
-    st.info("Select days and times above to generate a custom template")
+    st.warning("Please select at least one day and one time slot to generate the template.")
 
-with col2:
-    st.subheader("2. Upload Completed File")
-st.write("Upload your completed availability file here.")
+st.markdown('</div>', unsafe_allow_html=True)
+
+# ==================== STEP 2: Upload Completed File ====================
+st.markdown('<div class="step-header">Step 2: Upload Completed File</div>', unsafe_allow_html=True)
+
+if data_exists:
+    st.warning("**Note:** You already have availability data loaded. Uploading a new file will replace the existing data.")
+    
+    col_upload, col_reset = st.columns([3, 1])
+    with col_reset:
+        if st.button("Clear Existing Data", type="secondary", use_container_width=True):
+            if clear_availability_data():
+                st.success("Data cleared!")
+                st.rerun()
+    with col_upload:
+        st.markdown("Upload your completed template below:")
+else:
+    st.markdown("Upload your completed template after filling in referee availability:")
 
 uploaded_file = st.file_uploader(
-    "Choose your completed availability file",
+    "Choose File",
     type=['csv', 'xlsx', 'xls'],
-    help="Upload the template you filled out with availability data"
+    help="Upload the template you filled out with availability data",
+    label_visibility="collapsed"
 )
 
 if uploaded_file is not None:
-    st.write(f"**File:** {uploaded_file.name}")
+    st.success(f"File selected: **{uploaded_file.name}**")
     
-    if st.button("Process Upload", width='stretch'):
-        with st.spinner("Processing your file..."):
-            processed_df = process_uploaded_file(uploaded_file)
-            
-            if processed_df is not None:
-                st.success("File processed successfully!")
+    col_process, col_spacer = st.columns([2, 1])
+    with col_process:
+        if st.button("Process and Import", use_container_width=True, type="primary"):
+            with st.spinner("Processing your file..."):
+                processed_df = process_uploaded_file(uploaded_file)
                 
-                # Show summary
-                st.write("**Summary:**")
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    st.metric("Referees", len(processed_df))
-                    st.metric("Time Slots", len(processed_df.columns))
-                with col_b:
-                    total_avail = processed_df.sum().sum()
-                    st.metric("Total Availability", total_avail)
-                    avg_avail = processed_df.sum(axis=1).mean()
-                    st.metric("Avg per Referee", f"{avg_avail:.1f}")
-                
-                st.info("Data saved to DATA/Convert.csv")
-                st.rerun()  # Refresh to show the new data below
+                if processed_df is not None:
+                    st.success("File processed successfully!")
+                    
+                    # Show summary
+                    st.markdown("**Import Summary:**")
+                    col_a, col_b, col_c, col_d = st.columns(4)
+                    with col_a:
+                        st.metric("Referees", len(processed_df))
+                    with col_b:
+                        st.metric("Time Slots", len(processed_df.columns))
+                    with col_c:
+                        total_avail = processed_df.sum().sum()
+                        st.metric("Total Availability", int(total_avail))
+                    with col_d:
+                        avg_avail = processed_df.sum(axis=1).mean()
+                        st.metric("Avg per Referee", f"{avg_avail:.1f}")
+                    
+                    st.info("Data has been saved and is ready to use.")
+                    st.rerun()
 
-# Reset button to upload another file
-if os.path.exists('DATA/Convert.csv'):
-    st.markdown("---")
-    if st.button("Reset & Upload Another File", type="secondary", width='stretch'):
-        # Clear the existing data
-        if clear_availability_data():
-            st.success("Data cleared! You can now upload a new availability file.")
-            st.rerun()
+st.markdown('</div>', unsafe_allow_html=True)
 
-# Availability Status Confirmation
+# ==================== Current Status ====================
 st.markdown("---")
-st.subheader("Availability Status")
+st.subheader("Current Status")
 
 # Check for availability data without caching
 try:
@@ -184,13 +211,20 @@ try:
         num_slots = len(availability_df.columns)
         total_availability = availability_df.sum().sum()
         
-        st.success(f"✅ Availability data loaded: {num_refs} referees × {num_slots} time slots")
-        st.info(f"Total availability entries: {int(total_availability)}")
+        st.success(f"Availability data loaded: {num_refs} referees across {num_slots} time slots")
+        
+        # Show summary in columns
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Referees", num_refs)
+        with col2:
+            st.metric("Time Slots", num_slots)
+        with col3:
+            st.metric("Total Availability Entries", int(total_availability))
     else:
-        st.warning("❌ No availability data found")
+        st.warning("No availability data found")
 except FileNotFoundError:
-    st.warning("❌ No availability data found")
+    st.info("No availability data uploaded yet. Follow the steps above to get started.")
 except Exception as e:
-    st.error(f"❌ Error reading availability data: {str(e)}")
-
+    st.error(f"Error reading availability data: {str(e)}")
 

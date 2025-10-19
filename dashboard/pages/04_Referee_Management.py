@@ -320,6 +320,123 @@ with tab3:
             else:
                 st.error("Please enter a referee name")
 
+# Dialog for editing individual referee availability
+@st.dialog("Edit Referee Availability", width="large")
+def edit_referee_availability_dialog(ref_index):
+    """Dialog for editing a single referee's availability across all time slots"""
+    
+    if 'referees' not in st.session_state or not st.session_state['referees']:
+        st.error("No referees found!")
+        return
+    
+    referees = st.session_state['referees']
+    time_columns = st.session_state.get('time_columns', [])
+    
+    if ref_index < 0 or ref_index >= len(referees):
+        st.error("Invalid referee index!")
+        return
+    
+    ref = referees[ref_index]
+    ref_name = ref.get_name()
+    
+    if not time_columns:
+        st.error("No time slots found!")
+        return
+    
+    st.markdown(f"### {ref_name}")
+    st.markdown("Toggle availability for each time slot. **Checked = Available, Unchecked = Not Available**")
+    
+    # Create a temporary copy of availability data for this referee
+    temp_key = f'temp_availability_{ref_index}'
+    if temp_key not in st.session_state:
+        st.session_state[temp_key] = ref.get_availability().copy()
+    
+    # Group time columns by day
+    days_dict = {}
+    for time_col in time_columns:
+        if '_' in time_col:
+            day, time = time_col.split('_', 1)
+            if day not in days_dict:
+                days_dict[day] = []
+            days_dict[day].append((time, time_col))
+    
+    # Create tabs for each day
+    if days_dict:
+        day_tabs = st.tabs(list(days_dict.keys()))
+        
+        for day_idx, (day, tab) in enumerate(zip(days_dict.keys(), day_tabs)):
+            with tab:
+                st.markdown(f"#### {day}")
+                
+                # Create a grid layout for time slots
+                time_slots = days_dict[day]
+                
+                # Show time slots in a more compact format
+                cols_per_row = 4
+                for i in range(0, len(time_slots), cols_per_row):
+                    cols = st.columns(cols_per_row)
+                    for j in range(cols_per_row):
+                        if i + j < len(time_slots):
+                            time, time_col = time_slots[i + j]
+                            with cols[j]:
+                                # Find the index in the full time_columns list
+                                full_idx = time_columns.index(time_col)
+                                current_val = st.session_state[temp_key][full_idx]
+                                
+                                # Toggle checkbox for availability
+                                is_available = st.checkbox(
+                                    time,
+                                    value=bool(current_val),
+                                    key=f"avail_{ref_index}_{day}_{i}_{j}",
+                                )
+                                
+                                # Update temp data
+                                st.session_state[temp_key][full_idx] = 1 if is_available else 0
+    
+    st.markdown("---")
+    
+    # Quick actions
+    col_select1, col_select2, col_select3 = st.columns(3)
+    with col_select1:
+        if st.button("✅ Select All", use_container_width=True):
+            st.session_state[temp_key] = [1] * len(time_columns)
+            st.rerun()
+    with col_select2:
+        if st.button("❌ Clear All", use_container_width=True):
+            st.session_state[temp_key] = [0] * len(time_columns)
+            st.rerun()
+    with col_select3:
+        if st.button("🔄 Reset to Original", use_container_width=True):
+            st.session_state[temp_key] = ref.get_availability().copy()
+            st.rerun()
+    
+    st.markdown("---")
+    
+    # Action buttons
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        if st.button("💾 Save Changes", type="primary", use_container_width=True):
+            # Apply changes to the referee object
+            new_availability = st.session_state[temp_key]
+            ref.set_availability(new_availability)
+            
+            # Mark as having unsaved changes
+            st.session_state['unsaved_ref_changes'] = True
+            
+            # Clear temp data
+            del st.session_state[temp_key]
+            
+            st.success(f"Availability updated for {ref_name}! Remember to 'Save All Changes' to persist to file.")
+            st.rerun()
+    
+    with col2:
+        if st.button("Cancel", use_container_width=True):
+            # Clear temp data
+            if temp_key in st.session_state:
+                del st.session_state[temp_key]
+            st.rerun()
+
 with tab1:
     st.markdown("#### Current Referees")
     
@@ -403,7 +520,7 @@ with tab1:
                 # Use a container for each referee with custom styling
                 st.markdown('<div class="referee-row">', unsafe_allow_html=True)
                 with st.container():
-                    cols = st.columns([2, 2, 2, 1, 1, 1])
+                    cols = st.columns([2, 2, 2, 1, 1, 1, 1])
                     with cols[0]:
                         name = ref.get_name() if hasattr(ref, 'get_name') else str(ref)
                         st.markdown(f"**{name}**")
@@ -458,6 +575,14 @@ with tab1:
                             except:
                                 pass
                     with cols[5]:
+                        # Edit Availability button
+                        if st.button("📅 Edit", key=f"edit_avail_{i}"):
+                            # Clear any existing temp data for this ref
+                            temp_key = f'temp_availability_{i-1}'
+                            if temp_key in st.session_state:
+                                del st.session_state[temp_key]
+                            edit_referee_availability_dialog(i-1)
+                    with cols[6]:
                         # Remove referee button
                         if st.button("Remove", key=f"remove_{i}"):
                             # Remove referee from session state and rerun

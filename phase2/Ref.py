@@ -12,6 +12,10 @@ class Ref:
 
     def get_availability(self):
         return self.__availability
+    
+    def set_availability(self, availability):
+        """Set the availability list for this referee"""
+        self.__availability = list(availability) if availability else []
 
     def get_email(self):
         return self.__email

@@ -190,13 +190,17 @@ def schedule_to_excel(refs, games, output_path='DATA/schedule.xlsx'):
             col = start_time_col
             for time in times:
                 if time in scheduled_times:
-                    # Find game location for this time slot
+                    # Find game location for this time slot (just the number)
                     game_location = ""
                     ref_name = ref.get_name()
                     if ref_name in ref_assignments:
                         for game in ref_assignments[ref_name]:
                             if game.get_date() == day and game.get_time() == time:
-                                game_location = game.get_location()
+                                # Use location_number if available, otherwise use full location
+                                if hasattr(game, 'get_location_number'):
+                                    game_location = str(game.get_location_number())
+                                else:
+                                    game_location = game.get_location()
                                 break
                     worksheet.write(row, col, game_location or "✓", time_format)
                 else:

@@ -2,14 +2,14 @@ import streamlit as st
 import pandas as pd
 import sys
 import os
+import io
 
 # Add the parent directory to the path to import from phase1
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 # Set page config
 st.set_page_config(
-    page_title="Overview - Referee Scheduling",
-    page_icon="🏢",
+    page_title="Quick Start - Referee Scheduling",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -24,57 +24,60 @@ st.markdown("""
     max-width: 95% !important;
     padding-top: 1rem !important;
 }
-</style>
-""", unsafe_allow_html=True)
 
-# Add table styling CSS for better readability
-st.markdown("""
-<style>
-/* Table styling for better readability */
-.stDataFrame, .stTable {
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    border-radius: 8px !important;
-    overflow: hidden !important;
+/* Custom box styling */
+.info-box {
+    padding: 20px;
+    border-radius: 10px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    margin: 10px 0;
+    background-color: rgba(255, 255, 255, 0.05);
 }
 
-.stDataFrame th, .stTable th {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
-    border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
-    padding: 8px !important;
-    font-weight: 600 !important;
-}
-
-.stDataFrame td, .stTable td {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
-    border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
-    padding: 8px !important;
-}
-
-.stDataFrame th:last-child, .stTable th:last-child,
-.stDataFrame td:last-child, .stTable td:last-child {
-    border-right: none !important;
-}
-
-.stDataFrame tr:last-child td, .stTable tr:last-child td {
-    border-bottom: none !important;
+.workflow-step {
+    padding: 15px;
+    border-left: 4px solid #4CAF50;
+    margin: 10px 0;
+    background-color: rgba(76, 175, 80, 0.1);
 }
 </style>
 """, unsafe_allow_html=True)
 
 # Title and description
-st.title("Referee Scheduling System - Overview")
-st.markdown("### Automated referee scheduling with optimization")
+st.title("Quick Start")
+st.markdown("### Get started with referee scheduling")
 
 
-# Master Excel Upload - available at the beginning
+# Workflow Directions
 st.markdown("---")
-st.subheader("Quick Start: Upload Complete Dataset")
-st.markdown("Have a complete dataset? Upload your master Excel file to get started instantly.")
+st.subheader("How It Works")
+st.markdown("""
+This system helps you create optimized referee schedules using a step-by-step workflow.
+""")
+
+workflow_directions = """
+<div class="info-box">
+<h4>Standard Workflow</h4>
+<p><strong>For new projects or updating data:</strong></p>
+<ol>
+    <li><strong>Availability Setup:</strong> Upload referee availability data (Excel/CSV format)</li>
+    <li><strong>Game Management:</strong> Upload your master game schedule or create games manually</li>
+    <li><strong>Referee Management:</strong> Review referee info, edit availability, adjust experience/effort levels</li>
+    <li><strong>Schedule Management:</strong> Run the optimizer and export your final schedule</li>
+</ol>
+<p><em>Use the sidebar navigation to access each section.</em></p>
+</div>
+"""
+st.markdown(workflow_directions, unsafe_allow_html=True)
+
+st.markdown("---")
+st.subheader("Re-Import Previous Session")
+st.markdown("If you have a master input file from a previous session, upload it here to restore your work.")
 
 uploaded_master_file = st.file_uploader(
-    "Choose Master Excel file (with Referees and Games sheets)",
+    "Upload Master Input File",
     type=['xlsx', 'xls'],
-    help="Upload a master file with both Referees and Games sheets to import everything at once",
+    help="Upload a master file with both 'Referees' and 'Games' sheets from a previous session",
     key="master_upload_quick"
 )
 
@@ -202,7 +205,6 @@ if uploaded_master_file is not None:
 
 # Check if availability data exists
 try:
-    import pandas as pd
     availability_df = pd.read_csv('DATA/Convert.csv', index_col=0)
     has_availability_data = len(availability_df) > 0
 except:
@@ -213,51 +215,9 @@ has_games = 'games' in st.session_state and len(st.session_state.get('games', []
 has_referees = 'referees' in st.session_state and len(st.session_state.get('referees', [])) > 0
 optimization_complete = st.session_state.get('optimization_complete', False)
 
-# Show workflow progress
-st.markdown("---")
-st.subheader("⚡ Workflow Progress")
-
-# Calculate progress
-total_steps = 4
-steps_completed = 0
-current_step_name = ""
-
-if has_availability_data:
-    steps_completed = 1
-    current_step_name = "Availability Setup Complete"
-    
-    if has_games:
-        steps_completed = 2
-        current_step_name = "Games Created"
-        
-        if has_referees:
-            steps_completed = 3
-            current_step_name = "Referees Loaded"
-            
-            if optimization_complete:
-                steps_completed = 4
-                current_step_name = "Optimization Complete"
-            else:
-                current_step_name = "Ready for Scheduling"
-        else:
-            current_step_name = "Need Referee Details"
-    else:
-        current_step_name = "Need Games"
-else:
-    current_step_name = "Need Availability Data"
-
-# Calculate percentage
-progress_percent = (steps_completed / total_steps) * 100
-
-# Display progress bar
-col1, col2 = st.columns([3, 1])
-with col1:
-    st.progress(progress_percent / 100, text=f"{current_step_name}")
-with col2:
-    st.metric("Progress", f"{steps_completed}/{total_steps} ({progress_percent:.0f}%)")
-
 # Show optimization results if complete
 if optimization_complete and has_referees and has_games:
+    st.markdown("---")
     st.success("**Optimization Complete!** Your schedule is ready.")
     
     total_assignments = sum(len(ref.get_optimized_games()) for ref in st.session_state['referees'])
@@ -275,78 +235,85 @@ if optimization_complete and has_referees and has_games:
         else:
             st.metric("Avg Games/Ref", "0")
     with col4:
-        if st.button("📈 View Full Schedule", type="primary"):
+        if st.button("View Full Schedule", type="primary"):
             st.switch_page("pages/05_Schedule_Management.py")
 
-# Master Input Sheet Download - only show when both refs and games exist
+# Export current data - only show when both refs and games exist
 if has_availability_data and has_games and has_referees:
     st.markdown("---")
-    st.subheader("Export Master Input Sheet")
-    st.markdown("Download your master input sheet with referees and games for backup or sharing.")
-    
-    import pandas as pd
-    import io
+    st.subheader("Export Master Input File")
+    st.markdown("Download your current data as a master input file. Use this file to restore your session later or share your configuration.")
     
     # Create master Excel with both referees and games
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        
-        # Sheet 1: Referees
-        if st.session_state.get('referees'):
-            ref_data = []
-            time_columns = st.session_state.get('time_columns', [])
+    def create_export_file():
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
             
-            for ref in st.session_state['referees']:
-                ref_row = {
-                    'Referee_Name': ref.get_name() if hasattr(ref, 'get_name') else str(ref),
-                    'Email': ref.get_email() if hasattr(ref, 'get_email') else '',
-                    'Phone': ref.get_phone_number() if hasattr(ref, 'get_phone_number') else '',
-                    'Experience': ref.get_experience() if hasattr(ref, 'get_experience') else 3,
-                    'Effort': ref.get_effort() if hasattr(ref, 'get_effort') else 3
-                }
+            # Sheet 1: Referees
+            if st.session_state.get('referees'):
+                ref_data = []
+                time_columns = st.session_state.get('time_columns', [])
                 
-                # Add availability data
-                if hasattr(ref, 'get_availability'):
-                    availability = ref.get_availability()
-                    for i, col in enumerate(time_columns):
-                        if i < len(availability):
-                            ref_row[col] = availability[i]
-                        else:
-                            ref_row[col] = 0
+                for ref in st.session_state['referees']:
+                    ref_row = {
+                        'Referee_Name': ref.get_name() if hasattr(ref, 'get_name') else str(ref),
+                        'Email': ref.get_email() if hasattr(ref, 'get_email') else '',
+                        'Phone': ref.get_phone_number() if hasattr(ref, 'get_phone_number') else '',
+                        'Experience': ref.get_experience() if hasattr(ref, 'get_experience') else 3,
+                        'Effort': ref.get_effort() if hasattr(ref, 'get_effort') else 3
+                    }
+                    
+                    # Add availability data
+                    if hasattr(ref, 'get_availability'):
+                        availability = ref.get_availability()
+                        for i, col in enumerate(time_columns):
+                            if i < len(availability):
+                                ref_row[col] = availability[i]
+                            else:
+                                ref_row[col] = 0
+                    
+                    ref_data.append(ref_row)
                 
-                ref_data.append(ref_row)
+                ref_df = pd.DataFrame(ref_data)
+                ref_df.to_excel(writer, sheet_name='Referees', index=False)
             
-            ref_df = pd.DataFrame(ref_data)
-            ref_df.to_excel(writer, sheet_name='Referees', index=False)
+            # Sheet 2: Games
+            if st.session_state.get('games'):
+                game_data = []
+                for game in st.session_state['games']:
+                    game_data.append({
+                        'Game_Number': game.get_number(),
+                        'Date': game.get_date(),
+                        'Time': game.get_time(),
+                        'Location_Descriptor': game.get_location_descriptor(),
+                        'Location_Number': game.get_location_number(),
+                        'Difficulty': game.get_difficulty(),
+                        'Division_Type': game.get_division_type() or '',
+                        'Division_Number': game.get_division_number() or '',
+                        'Min_Refs': game.get_min_refs(),
+                        'Max_Refs': game.get_max_refs()
+                    })
+                
+                game_df = pd.DataFrame(game_data)
+                game_df.to_excel(writer, sheet_name='Games', index=False)
         
-        # Sheet 2: Games
-        if st.session_state.get('games'):
-            game_data = []
-            for game in st.session_state['games']:
-                game_data.append({
-                    'Game_Number': game.get_number(),
-                    'Date': game.get_date(),
-                    'Time': game.get_time(),
-                    'Location_Descriptor': game.get_location_descriptor(),
-                    'Location_Number': game.get_location_number(),
-                    'Difficulty': game.get_difficulty(),
-                    'Division_Type': game.get_division_type() or '',
-                    'Division_Number': game.get_division_number() or '',
-                    'Min_Refs': game.get_min_refs(),
-                    'Max_Refs': game.get_max_refs()
-                })
-            
-            game_df = pd.DataFrame(game_data)
-            game_df.to_excel(writer, sheet_name='Games', index=False)
+        return output.getvalue()
     
     st.download_button(
-        label="Download Master Input Sheet",
-        data=output.getvalue(),
-        file_name="master_input_sheet.xlsx",
+        label="Download Master Input File",
+        data=create_export_file(),
+        file_name="master_input_export.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        width='stretch',
+        use_container_width=True,
         type="primary"
     )
+    st.info("This file contains all your referees, games, and configuration. Keep it safe for future sessions.")
 
 st.markdown("---")
-st.markdown("*Use the sidebar to navigate between different sections*")
+st.markdown("### Navigation")
+st.markdown("""
+- Use the **sidebar** to navigate between different sections
+- Follow the workflow in order: Availability Setup > Game Management > Referee Management > Schedule Management
+- Export your master input file regularly to save your progress
+- To start a new session with existing data, re-import your master input file from the top of this page
+""")
